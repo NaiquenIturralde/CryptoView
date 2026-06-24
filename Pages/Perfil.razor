@@ -1,0 +1,261 @@
+@page "/perfil"
+@inject CryptoDbContext DbContext
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject CryptoView.Services.AuthStateService AuthStateSvc
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Mi Perfil - CryptoView</PageTitle>
+
+<div class="page-container profile-container">
+    <!-- Page Header -->
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="display-5 fw-bold text-warning mb-1">Mi Perfil</h1>
+            <p class="text-muted lead mb-0">Información de tu cuenta</p>
+        </div>
+    </div>
+
+    <!-- Avatar + Name -->
+    <div class="text-center mb-4">
+        <div class="profile-avatar-wrapper" @onclick='() => Nav.NavigateTo("perfil/editar")'>
+            <div class="profile-avatar-circle">
+                @if (photoDataUrl != null)
+                {
+                    <img src="@photoDataUrl" class="profile-avatar-img" alt="Foto de perfil" />
+                }
+                else if (!string.IsNullOrEmpty(avatarIcon))
+                {
+                    <i class="bi @avatarIcon"></i>
+                }
+                else
+                {
+                    <i class="bi bi-person-circle"></i>
+                }
+            </div>
+            <div class="profile-avatar-overlay">
+                <i class="bi bi-pencil-square"></i>
+                <span>Editar perfil</span>
+            </div>
+        </div>
+
+        <h3 class="fw-bold mb-0" style="color: var(--color-yellow);">@displayName</h3>
+    </div>
+
+    <!-- ── Cards grid ── -->
+    <div class="perfil-cards-grid">
+
+        <!-- Card 1: Identidad -->
+        <div class="profile-info-card perfil-card-full">
+            <h6 class="pref-card-title"><i class="bi bi-person-badge"></i> Identidad</h6>
+            <div class="profile-info-row">
+                <span class="profile-info-label"><i class="bi bi-person me-2"></i>Nombre</span>
+                <span class="profile-info-value">@displayName</span>
+            </div>
+            <div class="profile-info-row">
+                <span class="profile-info-label"><i class="bi bi-at me-2"></i>Usuario</span>
+                <span class="profile-info-value">@displayUsername</span>
+            </div>
+            <div class="profile-info-row">
+                <span class="profile-info-label"><i class="bi bi-envelope me-2"></i>Email</span>
+                <span class="profile-info-value">@displayEmail</span>
+            </div>
+            <!-- Rol oculto según requisitos -->
+            <div class="profile-info-row">
+                <span class="profile-info-label"><i class="bi bi-calendar-check me-2"></i>Registro</span>
+                <span class="profile-info-value">Enero 2025</span>
+            </div>
+        </div>
+
+        <!-- Card 2: Ubicación y bio -->
+        <div class="profile-info-card">
+            <h6 class="pref-card-title"><i class="bi bi-geo-alt"></i> Ubicación y bio</h6>
+            @if (!string.IsNullOrWhiteSpace(displayPais))
+            {
+                <div class="profile-info-row">
+                    <span class="profile-info-label"><i class="bi bi-geo-alt me-2"></i>Ubicación</span>
+                    <span class="profile-info-value">@displayPais</span>
+                </div>
+            }
+            else
+            {
+                <div class="profile-info-row">
+                    <span class="profile-info-label"><i class="bi bi-geo-alt me-2"></i>Ubicación</span>
+                    <span class="profile-info-value text-muted fst-italic" style="font-size:0.85rem;">Sin especificar</span>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(displayBio))
+            {
+                <div class="profile-info-row" style="align-items:flex-start;">
+                    <span class="profile-info-label" style="padding-top:0.1rem;"><i
+                        class="bi bi-chat-quote me-2"></i>Bio</span>
+                        <span class="profile-info-value"
+                              style="max-width:65%;text-align:right;white-space:pre-wrap;">@displayBio</span>
+                    </div>
+                }
+            else
+                {
+                    <div class="profile-info-row">
+                        <span class="profile-info-label"><i class="bi bi-chat-quote me-2"></i>Bio</span>
+                        <span class="profile-info-value text-muted fst-italic" style="font-size:0.85rem;">Sin descripción</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Card 3: Preferencias resumidas -->
+            <div class="profile-info-card">
+                <h6 class="pref-card-title"><i class="bi bi-sliders"></i> Preferencias</h6>
+                <div class="profile-info-row">
+                    <span class="profile-info-label"><i class="bi bi-currency-exchange me-2"></i>Moneda</span>
+                    <span class="profile-info-value">
+                        @displayMoneda
+                        <a href="preferencias" class="ms-2 text-warning" style="font-size:0.75rem;opacity:0.7;"
+                           title="Editar en Preferencias">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </span>
+                </div>
+                <div class="profile-info-row">
+                    <span class="profile-info-label text-muted" style="font-size:0.75rem;">
+                        <i class="bi bi-info-circle me-1"></i>Configuración del sistema
+                    </span>
+                    <a href="preferencias" class="btn btn-outline-warning btn-sm py-0 px-2" style="font-size:0.75rem;">
+                        <i class="bi bi-arrow-right me-1"></i>Ir a Preferencias
+                    </a>
+                </div>
+            </div>
+
+            <!-- Card 4: Criptomonedas seguidas (full width) -->
+            <div class="profile-info-card perfil-card-full">
+                <h6 class="pref-card-title"><i class="bi bi-star-fill"></i> Criptomonedas Seguidas</h6>
+                @if (displayedCryptos.Count > 0)
+                {
+                    <div class="mt-2">
+                        @foreach (var c in displayedCryptos)
+                        {
+                            <span class="crypto-badge">@c.Symbol.ToUpper() — @c.Name</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Todavía no seguís ninguna criptomoneda.
+                        <a href="cryptolist" class="text-warning">Agregar desde Mis Criptomonedas</a>.
+                    </p>
+                }
+            </div>
+
+        </div>
+    </div>
+
+@code {
+
+    private List<CryptoCurrency> cryptos = new();
+    private List<CryptoCurrency> displayedCryptos = new();
+    private string? photoDataUrl = null;
+    private string? avatarIcon = null;
+    private bool isProfileLoaded = false;
+    private string? currentUsername = null;
+    private int _currentUserId = 0;
+
+    // Display values (sin fallback a admin/demo)
+    private string displayName = "";
+    private string displayUsername = "";
+    private string displayEmail = "";
+    private string displayBio = "";
+    private string displayPais = "";
+    private string displayMoneda = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthStateSvc.IsAuthenticated())
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+        // DB queries are safe during prerendering (no JS interop)
+        try { cryptos = await DbContext.CryptoCurrencies.ToListAsync(); } catch { cryptos = new(); }
+        displayedCryptos = cryptos;
+        // userId is server-side — safe during prerendering
+        _currentUserId = AuthStateSvc.GetCurrentUserId() ?? 0;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !isProfileLoaded)
+        {
+            isProfileLoaded = true;
+
+            // JS interop moved here — safe because first render already completed
+            currentUsername = await JS.InvokeAsync<string>("sessionManager.getUsername");
+            await JS.InvokeVoidAsync("console.log", $"[Perfil] currentUsername: {currentUsername}");
+
+            if (string.IsNullOrWhiteSpace(currentUsername)) return;
+
+            // Claves dinámicas
+            var profilePhotoKey = $"cv_profile_photo_{currentUsername}";
+            var profileDataKey = $"cv_profile_data_{currentUsername}";
+            await JS.InvokeVoidAsync("console.log", $"[Perfil] profilePhotoKey: {profilePhotoKey}, profileDataKey: {profileDataKey}");
+
+            // Cargar foto: primero intenta clave por UserId (como guarda EditarPerfil), luego por username
+            var photo = _currentUserId > 0
+                ? await JS.InvokeAsync<string?>("localStorage.getItem", $"cv_profile_photo_{_currentUserId}")
+                : null;
+            if (string.IsNullOrEmpty(photo))
+                photo = await JS.InvokeAsync<string?>("localStorage.getItem", $"cv_profile_photo_{currentUsername}");
+            if (!string.IsNullOrEmpty(photo))
+                photoDataUrl = photo;
+            else
+                photoDataUrl = null;
+
+            // Cargar datos
+            var dataJson = await JS.InvokeAsync<string?>("localStorage.getItem", profileDataKey);
+            await JS.InvokeVoidAsync("console.log", $"[Perfil] dataJson: {dataJson}");
+            if (!string.IsNullOrEmpty(dataJson))
+            {
+                try
+                {
+                    var d = System.Text.Json.JsonSerializer.Deserialize<ProfileDataDto>(dataJson);
+                    if (d != null)
+                    {
+                        displayName = (!string.IsNullOrWhiteSpace(d.Nombre) || !string.IsNullOrWhiteSpace(d.Apellido)) ? $"{d.Nombre} {d.Apellido}".Trim() : "Sin completar";
+                        displayUsername = !string.IsNullOrWhiteSpace(d.Username) ? d.Username : "";
+                        displayEmail = !string.IsNullOrWhiteSpace(d.Email) ? d.Email : "";
+                        displayBio = !string.IsNullOrWhiteSpace(d.Bio) ? d.Bio : "";
+                        displayPais = !string.IsNullOrWhiteSpace(d.Pais) ? d.Pais : "";
+                        displayMoneda = !string.IsNullOrWhiteSpace(d.Moneda) ? d.Moneda : "";
+                        avatarIcon = (!string.IsNullOrWhiteSpace(d.AvatarIcon) && photoDataUrl == null) ? d.AvatarIcon : null;
+
+                        if (d.FavoriteCryptoIds?.Length > 0)
+                            displayedCryptos = cryptos.Where(c => d.FavoriteCryptoIds.Contains(c.Id)).ToList();
+                        else
+                            displayedCryptos = new List<CryptoCurrency>();
+                    }
+                }
+                catch { /* si el JSON está corrupto, deja campos vacíos */ }
+            }
+            else
+            {
+                // Si no hay datos, mostrar perfil vacío/controlado
+                displayName = "Sin completar";
+                displayUsername = currentUsername ?? "";
+                displayEmail = "";
+                displayBio = "";
+                displayPais = "";
+                displayMoneda = "";
+                avatarIcon = null;
+                displayedCryptos = new List<CryptoCurrency>();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private record ProfileDataDto(
+        string? Nombre, string? Apellido, string? Email, string? Username,
+        string? Bio, string? Pais, string? Moneda, string? AvatarIcon,
+        int[]? FavoriteCryptoIds);
+}
+

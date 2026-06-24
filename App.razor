@@ -1,0 +1,68 @@
+@* App.razor - Punto de entrada. Limpia sesión al iniciar para evitar autologin. *@
+@inject IJSRuntime JS
+
+@if (!_initialized)
+{
+    <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center;">
+            <div class="spinner-border text-warning mb-3" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Inicializando...</span>
+            </div>
+            <p class="text-muted">Inicializando aplicación...</p>
+        </div>
+    </div>
+}
+else
+{
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>No encontrado</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <div class="container mt-5 text-center">
+                    <h1 class="display-1 text-warning">404</h1>
+                    <p class="lead">Lo sentimos, no pudimos encontrar esta página.</p>
+                    <a href="/" class="btn btn-primary mt-3">
+                        <i class="bi bi-house-door"></i> Volver al inicio
+                    </a>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
+}
+
+@code {
+    private bool _initialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Console.WriteLine("[App] Iniciando aplicación - limpiando sesión previa (no autologin)");
+
+            // Limpia todos los datos de sesión del localStorage al iniciar.
+            // Esto garantiza que NUNCA haya un login automático entre reinicios.
+            // La autenticación vive SOLO en memoria (AuthStateService._cachedUser).
+            try
+            {
+                await JS.InvokeVoidAsync("sessionManager.logout");
+                Console.WriteLine("[App] localStorage de sesión limpiado correctamente");
+            }
+            catch
+            {
+                // JS no disponible durante prerendering — se reintenta en el cliente
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[App] Error en inicialización: {ex.Message}");
+        }
+        finally
+        {
+            _initialized = true;
+        }
+    }
+}

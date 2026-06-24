@@ -1,0 +1,598 @@
+@page "/perfil/editar"
+@inject CryptoDbContext DbContext
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject CryptoView.Services.ProfileService ProfileSvc
+@inject CryptoView.Services.AuthStateService AuthStateSvc
+@using Microsoft.EntityFrameworkCore
+@using System.Text.Json
+
+<PageTitle>Editar Perfil - CryptoView</PageTitle>
+
+<div class="perfil-editar-container">
+
+    <!-- Page Header -->
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="display-5 fw-bold text-warning mb-1">Editar perfil</h1>
+            <p class="text-muted lead mb-0">Actualizá tu información personal</p>
+        </div>
+        <a href="perfil" class="btn btn-outline-info btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Volver
+        </a>
+    </div>
+
+    <!-- Error de validación (inline) -->
+    @if (!string.IsNullOrEmpty(validationError))
+    {
+        <div class="alert alert-danger py-2 mb-4 d-flex align-items-center gap-2" style="border-left: 4px solid #dc3545;">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            <span>@validationError</span>
+        </div>
+    }
+
+    <!-- ── SECCIÓN 1: Foto de perfil ── -->
+    <div class="pref-card mb-4">
+        <div class="pref-card-title">
+            <i class="bi bi-camera"></i> Foto de perfil
+        </div>
+
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+            <!-- Preview actual -->
+            <div class="avatar-preview-circle">
+                @if (photoDataUrl != null)
+                {
+                    <img src="@photoDataUrl" alt="Foto actual" />
+                }
+                else if (!string.IsNullOrEmpty(selectedAvatarIcon))
+                {
+                    <i class="bi @selectedAvatarIcon"></i>
+                }
+                else
+                {
+                    <i class="bi bi-person-circle"></i>
+                }
+            </div>
+
+            <!-- Acciones de foto -->
+            <div>
+                <div class="d-flex gap-2 flex-wrap mb-2">
+                    <button class="btn btn-sm btn-outline-warning" @onclick="TriggerFilePicker">
+                        <i class="bi bi-upload me-1"></i>Subir foto
+                    </button>
+                    @if (photoDataUrl != null)
+                    {
+                        <button class="btn btn-sm btn-outline-danger" @onclick="RemovePhoto">
+                            <i class="bi bi-x-circle me-1"></i>Quitar foto
+                        </button>
+                    }
+                </div>
+                <small class="text-muted d-block" style="font-size:0.75rem;">
+                    Formatos permitidos: JPG, PNG, WEBP · Máx. 2 MB
+                </small>
+            </div>
+        </div>
+
+        <InputFile id="edit-file-input" OnChange="HandlePhotoSelected" accept="image/jpeg,image/png,image/webp"
+                   style="display:none;" />
+
+        <!-- Avatares predefinidos -->
+        <div class="mt-3">
+            <small class="text-muted d-block mb-1"
+                   style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">
+                O elegí un avatar predefinido
+            </small>
+            <div class="avatar-options-grid">
+                @foreach (var icon in predefinedAvatars)
+                {
+                    <div class="avatar-option @(selectedAvatarIcon == icon && photoDataUrl == null ? "selected" : "")"
+                         @onclick="() => SelectAvatar(icon)" title="@icon">
+                        <i class="bi @icon"></i>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SECCIÓN 2: Datos personales ── -->
+    <div class="pref-card mb-4">
+        <div class="pref-card-title">
+            <i class="bi bi-person-lines-fill"></i> Datos personales
+        </div>
+
+        <div class="row g-3">
+            <!-- Nombre / Apellido -->
+            <div class="col-sm-6">
+                <label class="form-label text-muted"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Nombre</label>
+                <input type="text" class="form-control" @bind="nombre" placeholder="Tu nombre" />
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label text-muted"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Apellido</label>
+                <input type="text" class="form-control" @bind="apellido" placeholder="Tu apellido" />
+            </div>
+
+            <!-- Email -->
+            <div class="col-12">
+                <label class="form-label text-muted"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Email</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                    <input type="email" class="form-control" @bind="email" placeholder="tu@email.com" />
+                </div>
+            </div>
+
+            <!-- Nombre de usuario -->
+            <div class="col-12">
+                <label class="form-label text-muted"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Nombre de usuario</label>
+                <div class="input-group">
+                    <span class="input-group-text">@@</span>
+                    <input type="text" class="form-control" @bind="username" placeholder="usuario" />
+                </div>
+            </div>
+
+            <!-- Bio -->
+            <div class="col-12">
+                <label class="form-label text-muted"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Bio / Descripción</label>
+                <textarea class="form-control" rows="3" @bind="bio" placeholder="Contá algo sobre vos..."></textarea>
+            </div>
+
+            <!-- País -->
+            <div class="col-12">
+                <label class="form-label text-muted"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">País / Ubicación</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                    <input type="text" class="form-control" @bind="pais" placeholder="Argentina" />
+                </div>
+            </div>
+
+            <!-- Criptomonedas favoritas -->
+            <div class="col-12">
+                <label class="form-label text-muted d-block"
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    Criptomonedas seguidas
+                </label>
+                @if (cryptos.Count == 0)
+                {
+                    <p class="text-muted small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>No hay criptomonedas disponibles.
+                        <a href="cryptolist" class="text-warning">Agregá desde Mis Criptomonedas</a>.
+                    </p>
+                }
+                else
+                {
+                    <div class="crypto-checks-grid">
+                        @foreach (var c in cryptos)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chk-@c.Id"
+                                       checked="@favoriteCryptoIds.Contains(c.Id)"
+                                       @onchange="e => ToggleFavorite(c.Id, (bool)(e.Value ?? false))" />
+                                <label class="form-check-label" for="chk-@c.Id">
+                                    @c.Symbol.ToUpper() — @c.Name
+                                </label>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- La sección de información de cuenta ha sido ocultada según requisitos -->
+
+    <!-- ── Acciones ── -->
+    <div class="perfil-edit-actions">
+        <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("perfil")'>
+            <i class="bi bi-x-lg me-1"></i>Cancelar
+        </button>
+        <button class="btn btn-primary" @onclick="SaveChanges" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                <span>Guardando...</span>
+            }
+            else
+            {
+                <i class="bi bi-check-lg me-1"></i><span>Guardar cambios</span>
+            }
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(saveResultMessage))
+    {
+        <div id="save-status-msg"
+             class="save-result-msg @(saveResultIsSuccess ? "save-result-success" : "save-result-error")">
+            <i class="bi @(saveResultIsSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i>
+            <span>@saveResultMessage</span>
+        </div>
+    }
+</div>
+
+@if (showToast)
+{
+    <div class="save-success-toast">
+        <i class="bi bi-check-circle-fill text-warning"></i>
+        Cambios guardados correctamente
+    </div>
+}
+
+@code {
+    // ── Form fields ──
+    private string nombre = string.Empty;
+    private string apellido = string.Empty;
+    private string email = string.Empty;
+    private string username = string.Empty;
+    private string bio = "";
+    private string pais = "";
+
+    // ── Avatar ──
+    private string? photoDataUrl = null;
+    private string? selectedAvatarIcon = "bi-person-circle";
+
+    private static readonly string[] predefinedAvatars =
+    [
+        "bi-person-circle",
+        "bi-robot",
+        "bi-star-fill",
+        "bi-gem",
+        "bi-lightning-charge-fill",
+        "bi-shield-check",
+        "bi-rocket-takeoff",
+        "bi-globe",
+        "bi-cpu",
+        "bi-graph-up-arrow"
+    ];
+
+    // ── Cryptos ──
+    private List<CryptoCurrency> cryptos = new();
+    private HashSet<int> favoriteCryptoIds = new();
+
+    // ── UI state ──
+    private bool _loaded = false;
+    private bool showToast = false;
+    private bool isSaving = false;
+    private string? validationError = null;
+    private string? saveResultMessage = null;
+    private bool saveResultIsSuccess = false;
+    private int _currentUserId = 0;
+    private string? _currentUsername = null; // needed to write localStorage with same key as Perfil.razor
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthStateSvc.IsAuthenticated())
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+        try { cryptos = await DbContext.CryptoCurrencies.ToListAsync(); } catch { cryptos = new(); }
+
+        // Obtener UserId desde AuthStateService (en memoria, disponible en prerender)
+        // NO usar JS aquí: OnInitializedAsync corre en el servidor durante prerender
+        // y JS interop no está disponible, lo que silenciosamente dejaba _currentUserId = 0.
+        var userId = AuthStateSvc.GetCurrentUserId();
+        if (userId.HasValue)
+            _currentUserId = userId.Value;
+        // Also capture username so we can write localStorage with the same key Perfil.razor reads
+        _currentUsername = AuthStateSvc.GetCurrentUsername();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_loaded)
+        {
+            _loaded = true;
+
+            // Segunda oportunidad: si el prerender no tenía el usuario, intentar por JS
+            if (_currentUserId <= 0)
+            {
+                try
+                {
+                    var userJson = await JS.InvokeAsync<string>("sessionManager.getUser");
+                    if (!string.IsNullOrEmpty(userJson))
+                    {
+                        var userObj = JsonSerializer.Deserialize<JsonElement>(userJson);
+                        if (userObj.TryGetProperty("id", out var idProp) && idProp.TryGetInt32(out var jsUserId))
+                            _currentUserId = jsUserId;
+                    }
+                }
+                catch { /* JS fallback no disponible */ }
+            }
+
+            if (_currentUserId <= 0)
+            {
+                await JS.InvokeVoidAsync("console.warn", "[EditarPerfil] UserId no válido, redirigiendo a login");
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            // El campo username siempre viene del servicio de autenticación
+            username = _currentUsername ?? string.Empty;
+
+            // 1. Cargar datos del servidor vía API (fuente de verdad para nombre/email/bio/pais)
+            await LoadProfileFromServer();
+
+            // 2. Intentar cargar datos desde localStorage como complemento o fallback
+            if (!string.IsNullOrEmpty(_currentUsername))
+            {
+                var lsKey = $"cv_profile_data_{_currentUsername}";
+                var lsJson = await JS.InvokeAsync<string?>("localStorage.getItem", lsKey);
+                if (!string.IsNullOrEmpty(lsJson))
+                {
+                    try
+                    {
+                        var lsData = JsonSerializer.Deserialize<JsonElement>(lsJson);
+
+                        // Completar campos que el API no cargó o que están vacíos
+                        if (string.IsNullOrEmpty(nombre) && lsData.TryGetProperty("Nombre", out var nProp))
+                            nombre = nProp.GetString() ?? nombre;
+                        if (string.IsNullOrEmpty(apellido) && lsData.TryGetProperty("Apellido", out var aProp))
+                            apellido = aProp.GetString() ?? apellido;
+                        if (string.IsNullOrEmpty(email) && lsData.TryGetProperty("Email", out var eProp))
+                            email = eProp.GetString() ?? email;
+                        if (string.IsNullOrEmpty(bio) && lsData.TryGetProperty("Bio", out var bProp))
+                            bio = bProp.GetString() ?? bio;
+                        if (string.IsNullOrEmpty(pais) && lsData.TryGetProperty("Pais", out var pProp))
+                            pais = pProp.GetString() ?? pais;
+
+                        // Avatar icon: siempre preferir el guardado (el API no lo devuelve)
+                        if (lsData.TryGetProperty("AvatarIcon", out var aiProp) && !string.IsNullOrEmpty(aiProp.GetString()))
+                            selectedAvatarIcon = aiProp.GetString();
+
+                        // Favoritos: cargar desde localStorage si el API no los proveyó
+                        if (favoriteCryptoIds.Count == 0 && lsData.TryGetProperty("FavoriteCryptoIds", out var favProp)
+                            && favProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in favProp.EnumerateArray())
+                                if (item.TryGetInt32(out var fid)) favoriteCryptoIds.Add(fid);
+                        }
+                    }
+                    catch { /* datos en localStorage con formato incorrecto, se ignoran */ }
+                }
+            }
+
+            // 3. Fallback final: si nombre sigue vacío, usar el username como nombre de display
+            if (string.IsNullOrEmpty(nombre) && !string.IsNullOrEmpty(_currentUsername))
+                nombre = _currentUsername;
+
+            // 4. Cargar foto del localStorage
+            var photoKey = $"cv_profile_photo_{_currentUserId}";
+            var photo = await JS.InvokeAsync<string?>("localStorage.getItem", photoKey);
+            // Fallback: intentar con clave por username (compatibilidad con versiones anteriores)
+            if (string.IsNullOrEmpty(photo) && !string.IsNullOrEmpty(_currentUsername))
+                photo = await JS.InvokeAsync<string?>("localStorage.getItem", $"cv_profile_photo_{_currentUsername}");
+            if (!string.IsNullOrEmpty(photo))
+            {
+                photoDataUrl = photo;
+                selectedAvatarIcon = null;
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadProfileFromServer()
+    {
+        try
+        {
+            var profileDto = await ProfileSvc.GetUserProfileAsync(_currentUserId);
+
+            if (profileDto != null)
+            {
+                // Nombre y apellido: separar FullName
+                if (!string.IsNullOrWhiteSpace(profileDto.FullName))
+                {
+                    var parts = profileDto.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 1) nombre = parts[0];
+                    if (parts.Length >= 2) apellido = string.Join(" ", parts.Skip(1));
+                }
+
+                if (!string.IsNullOrWhiteSpace(profileDto.Email)) email = profileDto.Email;
+                if (!string.IsNullOrWhiteSpace(profileDto.Bio)) bio = profileDto.Bio;
+                if (!string.IsNullOrWhiteSpace(profileDto.Country)) pais = profileDto.Country;
+
+                // Cargar criptomonedas favoritas
+                if (!string.IsNullOrWhiteSpace(profileDto.FavoriteCryptoIds))
+                {
+                    try
+                    {
+                        var ids = JsonSerializer.Deserialize<List<int>>(profileDto.FavoriteCryptoIds);
+                        if (ids != null) foreach (var id in ids) favoriteCryptoIds.Add(id);
+                    }
+                    catch { /* formato inválido, se ignora */ }
+                }
+
+                await JS.InvokeVoidAsync("console.log", $"[EditarPerfil] Perfil cargado: {profileDto.FullName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"[EditarPerfil] Excepción al cargar perfil: {ex.Message}");
+        }
+    }
+
+    private void ValidateLocal()
+    {
+        validationError = null;
+        var fullName = $"{nombre.Trim()} {apellido.Trim()}".Trim();
+
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            validationError = "El nombre es obligatorio.";
+            return;
+        }
+
+        if (fullName.Length > 100)
+        {
+            validationError = "El nombre no puede exceder 100 caracteres.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            validationError = "El email es obligatorio.";
+            return;
+        }
+
+        if (email.Length > 255)
+        {
+            validationError = "El email no puede exceder 255 caracteres.";
+            return;
+        }
+
+        // Simple email regex validation
+        var emailRegex = new System.Text.RegularExpressions.Regex(@"^[^\s@]+@[^\s@]+\.[^\s@]+$");
+        if (!emailRegex.IsMatch(email))
+        {
+            validationError = "El formato del email no es válido.";
+            return;
+        }
+    }
+
+    private void SelectAvatar(string icon)
+    {
+        selectedAvatarIcon = icon;
+        photoDataUrl = null;
+    }
+
+    private async Task TriggerFilePicker()
+    {
+        await JS.InvokeVoidAsync("triggerFileInput", "edit-file-input");
+    }
+
+    private async Task HandlePhotoSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+        const long maxSize = 2 * 1024 * 1024;
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: maxSize);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+            photoDataUrl = $"data:{file.ContentType};base64,{base64}";
+            selectedAvatarIcon = null;
+        }
+        catch { /* excede 2 MB o formato inválido — no cambia nada */ }
+    }
+
+    private void RemovePhoto()
+    {
+        photoDataUrl = null;
+        selectedAvatarIcon = "bi-person-circle";
+    }
+
+    private void ToggleFavorite(int id, bool isChecked)
+    {
+        if (isChecked) favoriteCryptoIds.Add(id);
+        else favoriteCryptoIds.Remove(id);
+    }
+
+    private async Task SaveChanges()
+    {
+        // Limpiar resultado anterior
+        saveResultMessage = null;
+
+        // Validar localmente
+        ValidateLocal();
+
+        if (!string.IsNullOrEmpty(validationError))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        if (_currentUserId <= 0)
+        {
+            validationError = "Sesión inválida. Por favor, inicia sesión nuevamente.";
+            StateHasChanged();
+            return;
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            // Combinar nombre y apellido
+            var fullName = $"{nombre.Trim()} {apellido.Trim()}".Trim();
+
+            // Serializar FavoriteCryptoIds como JSON
+            var favCryptoJson = favoriteCryptoIds.Count > 0 ? JsonSerializer.Serialize(favoriteCryptoIds.ToList()) : null;
+
+            // Guardar en DB vía ProfileService (Blazor Server: llamada directa, sin HTTP)
+            var dto = new ProfileService.ProfileDto(
+                FullName: fullName,
+                Email: email.Trim(),
+                Bio: string.IsNullOrWhiteSpace(bio) ? null : bio,
+                Country: string.IsNullOrWhiteSpace(pais) ? null : pais,
+                FavoriteCryptoIds: favCryptoJson
+            );
+
+            var (success, errorMsg) = await ProfileSvc.SaveUserProfileAsync(_currentUserId, dto);
+
+            if (success)
+            {
+                // Guardar foto en localStorage con clave por UserId
+                var photoKey = $"cv_profile_photo_{_currentUserId}";
+                if (photoDataUrl != null)
+                    await JS.InvokeVoidAsync("localStorage.setItem", photoKey, photoDataUrl);
+                else
+                    await JS.InvokeVoidAsync("localStorage.removeItem", photoKey);
+
+                // Escribir datos en localStorage para que Perfil.razor los lea
+                if (!string.IsNullOrEmpty(_currentUsername))
+                {
+                    var profileDataKey = $"cv_profile_data_{_currentUsername}";
+                    var profileJson = JsonSerializer.Serialize(new
+                    {
+                        Nombre = nombre.Trim(),
+                        Apellido = apellido.Trim(),
+                        Email = email.Trim(),
+                        Username = username.Trim(),
+                        Bio = bio,
+                        Pais = pais,
+                        Moneda = (string?)null,
+                        AvatarIcon = selectedAvatarIcon,
+                        FavoriteCryptoIds = favoriteCryptoIds.ToArray()
+                    });
+                    await JS.InvokeVoidAsync("localStorage.setItem", profileDataKey, profileJson);
+                }
+
+                // Mostrar mensaje de éxito debajo del botón con scroll suave
+                isSaving = false;
+                saveResultIsSuccess = true;
+                saveResultMessage = "Perfil actualizado correctamente.";
+                StateHasChanged();
+                await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
+
+                // Redirigir tras breve pausa
+                await Task.Delay(2000);
+                Nav.NavigateTo("perfil");
+            }
+            else
+            {
+                isSaving = false;
+                saveResultIsSuccess = false;
+                saveResultMessage = "No se pudo guardar el perfil. Revisá los datos o intentá nuevamente.";
+                StateHasChanged();
+                await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
+            }
+        }
+        catch (Exception ex)
+        {
+            isSaving = false;
+            saveResultIsSuccess = false;
+            saveResultMessage = "No se pudo guardar el perfil. Revisá los datos o intentá nuevamente.";
+            await JS.InvokeVoidAsync("console.error", $"[EditarPerfil] Error en SaveChanges: {ex}");
+            StateHasChanged();
+            await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
+        }
+    }
+
+}

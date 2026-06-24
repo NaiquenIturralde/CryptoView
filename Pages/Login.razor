@@ -1,0 +1,1475 @@
+@page "/login"
+@layout EmptyLayout
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject CryptoView.Services.AuthService AuthSvc
+@inject CryptoView.Services.AuthStateService AuthStateSvc
+
+<PageTitle>Iniciar sesión - CryptoView</PageTitle>
+
+@if (showRegister)
+{
+    <!-- ══ REGISTRO ══ -->
+    <div class="login-wrapper">
+        <div class="login-card">
+
+            <button class="login-close-btn" @onclick="CloseRegister" title="Volver a login">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+            <div class="login-brand">
+                <svg class="login-logo-svg" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" aria-label="CryptoView"
+                     role="img">
+                    <path d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z" fill="none" stroke="#FF7A00" stroke-width="3.5"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="60" cy="40" r="20" fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.5" />
+                    <circle cx="60" cy="40" r="14" fill="#FF7A00" opacity="0.9" />
+                    <polyline points="44,44 52,36 58,42 66,32 76,38" fill="none" stroke="#fff" stroke-width="2"
+                              stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+                </svg>
+                <h2 class="login-title">CryptoView</h2>
+                <p class="login-subtitle">Dashboard Educativo</p>
+            </div>
+
+            <h5 class="login-heading mb-3 text-center">Crear cuenta</h5>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="reg-username">Usuario</label>
+                <input id="reg-username" type="text" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regUsername"
+                       placeholder="Elegí un nombre de usuario" autocomplete="username"
+                       aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="reg-email">Email <span class="login-optional">(opcional)</span></label>
+                <input id="reg-email" type="email" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regEmail" placeholder="tu@email.com" autocomplete="email"
+                       aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="reg-password">Contraseña</label>
+                <input id="reg-password" type="password" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regPassword"
+                       placeholder="Elegí una contraseña" autocomplete="new-password"
+                       aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label login-label" for="reg-confirm">Confirmar contraseña</label>
+                <input id="reg-confirm" type="password" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regConfirm"
+                       placeholder="Repetí tu contraseña" autocomplete="new-password"
+                       aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(regError))
+            {
+                <div id="reg-error" class="alert alert-error alert-danger py-3 mb-3 alert-shake" role="alert" aria-live="polite">
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="bi bi-exclamation-circle-fill flex-shrink-0 mt-1"></i>
+                        <div>
+                            <strong>Error en el registro</strong>
+                            <p class="mb-0 mt-1">@regError</p>
+                        </div>
+                    </div>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(regSuccess))
+            {
+                <div class="alert alert-success py-2 mb-3">@regSuccess</div>
+            }
+
+            <button class="btn login-btn w-100 mb-3" @onclick="DoRegister" disabled="@isRegisterLoading">
+                @if (isRegisterLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Creando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-person-plus me-2"></i><span>Crear cuenta</span>
+                }
+            </button>
+
+            <p class="login-cta text-center">
+                ¿Ya tienes cuenta?
+                <button class="login-cta-link" @onclick="CloseRegister">Inicia sesión</button>
+            </p>
+
+        </div>
+    </div>
+}
+else
+{
+    <!-- ══ LOGIN ══ -->
+    <div class="login-wrapper">
+        <div class="login-card">
+
+            <button class="login-close-btn" @onclick="GoHome" title="Ir al inicio">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+            <div class="login-brand">
+                <svg class="login-logo-svg" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" aria-label="CryptoView"
+                     role="img">
+                    <path d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z" fill="none" stroke="#FF7A00" stroke-width="3.5"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="60" cy="40" r="20" fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.5" />
+                    <circle cx="60" cy="40" r="14" fill="#FF7A00" opacity="0.9" />
+                    <polyline points="44,44 52,36 58,42 66,32 76,38" fill="none" stroke="#fff" stroke-width="2"
+                              stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+                </svg>
+                <h2 class="login-title">CryptoView</h2>
+                <p class="login-subtitle">Dashboard Educativo</p>
+            </div>
+
+            <h5 class="login-heading mb-4 text-center">Iniciar sesión</h5>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="login-username">Usuario</label>
+                <input id="login-username" type="text" class="form-control login-input @(!string.IsNullOrEmpty(errorMessage) ? "input-error" : "")" @bind="username" @bind:event="oninput"
+                       placeholder="Ingresá tu usuario" @ref="usernameInput" autocomplete="username"
+                       aria-describedby="@(!string.IsNullOrEmpty(errorMessage) ? "login-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(errorMessage) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoLogin(); })" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="login-password">Contraseña</label>
+                <div class="login-input-group">
+                    <input id="login-password" type="@(showPassword ? "text" : "password")" class="form-control login-input login-input-pwd @(!string.IsNullOrEmpty(errorMessage) ? "input-error" : "")"
+                           @bind="password" @bind:event="oninput" placeholder="Ingresá tu contraseña" autocomplete="current-password"
+                           aria-describedby="@(!string.IsNullOrEmpty(errorMessage) ? "login-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(errorMessage) ? "true" : "false")"
+                           @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoLogin(); })" />
+                    <button class="login-pwd-toggle" type="button" @onclick="TogglePassword" tabindex="-1"
+                            aria-label="@(showPassword ? "Ocultar contraseña" : "Ver contraseña")">
+                        <i class="bi @(showPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error message with animation -->
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div id="login-error" class="alert alert-error alert-danger py-3 mb-3 alert-shake" role="alert" aria-live="polite">
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="bi bi-exclamation-circle-fill flex-shrink-0 mt-1"></i>
+                        <div>
+                            <strong>Error de acceso</strong>
+                            <p class="mb-0 mt-1">@errorMessage</p>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Password recovery link — visible solo tras error real de login -->
+            <div class="mb-4 text-end" style="min-height: 2rem;">
+                @if (showForgotPassword)
+                {
+                    <button id="forgot-password-btn" class="login-recovery-link login-recovery-animated" @onclick="OpenPasswordRecovery"
+                          title="Recuperar contraseña" @ref="forgotPasswordBtn">
+                        <i class="bi bi-key me-1"></i>¿Olvidaste tu contraseña?
+                    </button>
+                }
+            </div>
+
+            <button class="btn login-btn w-100 position-relative" @onclick="DoLogin" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span>Ingresando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-box-arrow-in-right me-2"></i><span>Ingresar</span>
+                }
+            </button>
+
+            <p class="login-cta text-center mt-4">
+                ¿Eres nuevo aquí?
+                <button class="login-cta-link" @onclick="OpenRegister">Registrarte ahora</button>
+            </p>
+
+        </div>
+    </div>
+}
+
+<!-- Password Recovery Modal -->
+@if (showPasswordRecoveryModal)
+{
+    <div class="login-modal-overlay" @onclick="ClosePasswordRecovery">
+        <div id="recovery-modal" class="login-modal" @onclick:stopPropagation="true" role="dialog" aria-modal="true" aria-labelledby="recovery-modal-title" @ref="recoveryModal">
+            <button class="login-modal-close" @onclick="ClosePasswordRecovery">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+            <div class="login-modal-header">
+                <i class="bi bi-key-fill"></i>
+                <h3 id="recovery-modal-title">Recuperar Contraseña</h3>
+            </div>
+
+            <div class="login-modal-body">
+                <p class="text-muted mb-4">
+                    Ingresá tu nombre de usuario y te ayudaremos a recuperar tu contraseña.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label login-label" for="recovery-username">Usuario</label>
+                    <input id="recovery-username" type="text" class="form-control login-input @(!string.IsNullOrEmpty(recoveryError) ? "input-error" : "")" @bind="recoveryUsername"
+                           placeholder="Tu nombre de usuario" autocomplete="username"
+                           aria-describedby="@(!string.IsNullOrEmpty(recoveryError) ? "recovery-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(recoveryError) ? "true" : "false")"
+                           @onkeydown="@(async (e) => { if (e.Key == "Enter") await SubmitRecovery(); })" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(recoveryError))
+                {
+                    <div id="recovery-error" class="alert alert-danger py-2 mb-3" role="alert" aria-live="polite">@recoveryError</div>
+                }
+
+                @if (!string.IsNullOrEmpty(recoverySuccess))
+                {
+                    <div class="alert alert-success py-2 mb-3" role="status" aria-live="polite">@recoverySuccess</div>
+                }
+            </div>
+
+            <div class="login-modal-footer">
+                <button class="btn btn-secondary" @onclick="ClosePasswordRecovery">Cancelar</button>
+                <button class="btn login-btn" @onclick="SubmitRecovery" disabled="@isRecoveryLoading">
+                    @if (isRecoveryLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Enviando...</span>
+                    }
+                    else
+                    {
+                        <span>Enviar enlace</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* ═══════════════════════════════════════════
+       LOGIN / REGISTER — shared base
+    ═══════════════════════════════════════════ */
+    .login-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .login-card {
+        position: relative;
+        border-radius: var(--radius-lg);
+        /* 16px — matches system card tokens */
+        padding: 2.75rem 2.25rem 2.25rem;
+        width: 100%;
+        max-width: 400px;
+        animation: slideUp 0.4s ease-out;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+
+    .login-card:hover {
+        transform: translateY(-4px);
+        box-shadow:
+            0 0 18px rgba(255, 122, 0, 0.20),
+            0 0 36px rgba(255, 122, 0, 0.12),
+            0 16px 40px rgba(0, 0, 0, 0.35);
+        border-color: rgba(255, 122, 0, 0.45);
+    }
+
+    @@keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* ── X close button ── */
+    .login-close-btn {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-sm);
+        /* 8px — matches system token */
+        border: 1.5px solid var(--accent, #ff7a00);
+        background: transparent;
+        color: var(--accent, #ff7a00);
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition: box-shadow 0.2s ease, transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+        line-height: 1;
+    }
+
+    .login-close-btn:hover {
+        transform: translateY(-2px);
+        box-shadow:
+            0 0 12px rgba(255, 122, 0, 0.30),
+            0 0 24px rgba(255, 122, 0, 0.15);
+        border-color: #ffa040;
+        color: #ffa040;
+        background: rgba(255, 122, 0, 0.10);
+    }
+
+    .login-close-btn:active {
+        transform: scale(0.96);
+    }
+
+    .login-close-btn:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.55);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px rgba(27, 119, 210, 0.12);
+    }
+
+    /* ── Brand header ── */
+    .login-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        margin-bottom: 1.25rem;
+    }
+
+    .login-title {
+        font-weight: 700;
+        font-size: 1.6rem;
+        margin: 0 0 0.15rem;
+        color: var(--accent);
+        font-family: var(--font-brand, 'Poppins', sans-serif);
+    }
+
+    .login-subtitle {
+        font-size: 0.85rem;
+        margin: 0;
+        color: var(--brand-blue);
+        /* matches NavMenu brand subtitle */
+    }
+
+    .login-heading {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    /* ── CTA register / back-to-login ── */
+    .login-cta {
+        font-size: 0.83rem;
+        margin: 0;
+    }
+
+    .login-cta-link {
+        color: var(--accent);
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        border: none;
+        border-bottom: 1px solid transparent;
+        background: none;
+        padding: 0;
+        font-size: inherit;
+        font-family: inherit;
+        transition: border-color 0.18s ease, color 0.18s ease;
+    }
+
+    .login-cta-link:hover {
+        color: #e06c00;
+        border-bottom-color: #e06c00;
+    }
+
+    .login-cta-link:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.18);
+    }
+
+    .login-optional {
+        font-size: 0.75rem;
+        font-weight: 400;
+        opacity: 0.65;
+    }
+
+    /* ── Error Alert with Animation ── */
+    .alert-error {
+        border: 1px solid rgba(220, 53, 69, 0.3);
+        background: rgba(220, 53, 69, 0.08);
+        color: var(--state-error);
+        border-radius: var(--radius-sm);  /* 8px — matches system token */
+        animation: slideDown 0.3s ease-out;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .alert-shake {
+        animation: shake 0.5s ease-in-out;
+    }
+
+    @@keyframes shake {
+
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+
+        25% {
+            transform: translateX(-5px);
+        }
+
+        75% {
+            transform: translateX(5px);
+        }
+    }
+
+    /* ── Password Recovery Link ── */
+    .login-recovery-link {
+        font-size: 0.85rem;
+        color: var(--accent);
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        border: none;
+        background: none;
+        font-family: inherit;
+        transition: all 0.2s ease;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--radius-sm);  /* 8px — matches system token */
+    }
+
+    .login-recovery-link:hover {
+        color: #ffa040;
+        text-shadow: 0 0 8px rgba(255, 122, 0, 0.4);
+        transform: translateX(2px);
+    }
+
+    .login-recovery-link:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.18);
+    }
+
+    /* ── Primary button ── */
+    .login-btn {
+        background: linear-gradient(135deg, var(--accent) 0%, #e06500 100%);
+        color: #fff;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-sm);
+        /* 8px — matches system .btn */
+        padding: 0.65rem;
+        font-size: 1rem;
+        transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.18s ease;
+        box-shadow: 0 4px 14px var(--accent-glow);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .login-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #ff8f1a 0%, var(--accent) 100%);
+        box-shadow: 0 6px 20px var(--accent-glow);
+        color: #fff;
+        transform: translateY(-2px);
+    }
+
+    .login-btn:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .login-btn:disabled {
+        opacity: 0.45;
+        /* matches system .btn:disabled */
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    .login-btn .spinner-border {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    /* ── Modal for Password Recovery ── */
+    .login-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    .login-modal {
+        background: inherit;
+        border-radius: var(--radius-md);  /* 12px — matches system token */
+        width: 100%;
+        max-width: 380px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: slideUp 0.3s ease-out;
+        position: relative;
+    }
+
+    .login-modal-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: transparent;
+        border: none;
+        color: inherit;
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        border-radius: var(--radius-sm);
+        /* 8px — matches system token */
+    }
+
+    .login-modal-close:hover {
+        background: rgba(255, 122, 0, 0.1);
+        color: var(--accent);
+    }
+
+    .login-modal-close:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.18);
+    }
+
+    .login-modal-header {
+        padding: 2rem 1.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        border-bottom: 1px solid rgba(255, 122, 0, 0.2);
+    }
+
+    .login-modal-header i {
+        color: var(--accent);
+        font-size: 1.5rem;
+    }
+
+    .login-modal-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .login-modal-body {
+        padding: 1.75rem;
+    }
+
+    .login-modal-footer {
+        padding: 1.25rem 1.75rem;
+        border-top: 1px solid rgba(255, 122, 0, 0.1);
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+    }
+
+    /* ═══════════════════════════════════════════
+       DARK THEME
+    ═══════════════════════════════════════════ */
+    :root.theme-dark .login-wrapper {
+        background: #0f1226;
+    }
+
+    :root.theme-dark .login-card {
+        background: #162041;
+        border: 1px solid var(--border-soft);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
+    }
+
+    :root.theme-dark .login-modal {
+        background: #162041;
+        border: 1px solid var(--border-soft);
+    }
+
+    :root.theme-dark .login-heading {
+        color: #cbd5e1;
+    }
+
+    /* .login-subtitle dark handled by base rule — var(--brand-blue) */
+
+    :root.theme-dark .login-label {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    :root.theme-dark .login-input {
+        background: #0f172a;
+        border: 1px solid #334155;
+        color: #f3f4f6;
+        border-radius: var(--radius-sm);  /* 8px */
+        transition: border-color 0.2s ease;
+    }
+
+    :root.theme-dark .login-input:hover {
+        border-color: #475569;
+    }
+
+    :root.theme-dark .login-input::placeholder {
+        color: #475569;
+    }
+
+    :root.theme-dark .login-input:focus {
+        background: #0f172a;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.2rem rgba(255, 122, 0, 0.25);
+        color: #f3f4f6;
+        outline: none;
+    }
+
+    :root.theme-dark .login-input.input-error {
+        border-color: var(--state-error);
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    }
+
+    :root.theme-dark .login-cta {
+        color: #64748b;
+    }
+
+    :root.theme-dark .login-optional {
+        color: #475569;
+    }
+
+    :root.theme-dark .login-close-btn {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    :root.theme-dark .login-recovery-link {
+        color: var(--accent);
+    }
+
+    :root.theme-dark .login-modal-header {
+        border-bottom-color: rgba(255, 122, 0, 0.2);
+        color: #cbd5e1;
+    }
+
+    :root.theme-dark .login-modal-footer {
+        border-top-color: rgba(255, 122, 0, 0.1);
+    }
+
+    :root.theme-dark .btn-secondary {
+        background: #334155;
+        border-color: #334155;
+        color: #f3f4f6;
+    }
+
+    :root.theme-dark .btn-secondary:hover {
+        background: #475569;
+        border-color: #475569;
+    }
+
+    /* ═══════════════════════════════════════════
+       LIGHT THEME
+    ═══════════════════════════════════════════ */
+    :root.theme-light .login-wrapper {
+        background: #eef0f5;
+    }
+
+    :root.theme-light .login-card {
+        background: #ffffff;
+        border: 1px solid var(--border-soft);
+        box-shadow: 0 4px 28px rgba(0, 0, 0, 0.09);
+    }
+
+    :root.theme-light .login-modal {
+        background: #ffffff;
+        border: 1px solid var(--border-soft);
+    }
+
+    :root.theme-light .login-heading {
+        color: #6b7280;
+    }
+
+    /* .login-subtitle light handled by base rule — var(--brand-blue) */
+
+    :root.theme-light .login-label {
+        color: #374151;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    :root.theme-light .login-input {
+        background: #f9fafb;
+        border: 1px solid #d1d5db;
+        color: #1f2937;
+        border-radius: var(--radius-sm);  /* 8px */
+        transition: border-color 0.2s ease;
+    }
+
+    :root.theme-light .login-input:hover {
+        border-color: #b0b7c3;
+    }
+
+    :root.theme-light .login-input::placeholder {
+        color: #9ca3af;
+    }
+
+    :root.theme-light .login-input:focus {
+        background: #fff;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.2rem rgba(255, 122, 0, 0.18);
+        color: #1f2937;
+        outline: none;
+    }
+
+    :root.theme-light .login-input.input-error {
+        border-color: var(--state-error);
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.20);
+    }
+
+    :root.theme-light .login-cta {
+        color: #9ca3af;
+    }
+
+    :root.theme-light .login-optional {
+        color: #9ca3af;
+    }
+
+    :root.theme-light .login-close-btn {
+        border-color: var(--brand-blue);
+        color: var(--brand-blue);
+    }
+
+    :root.theme-light .login-recovery-link {
+        color: var(--accent);
+    }
+
+    :root.theme-light .login-modal-header {
+        border-bottom-color: rgba(0, 0, 0, 0.1);
+        color: #374151;
+    }
+
+    :root.theme-light .login-modal-footer {
+        border-top-color: rgba(0, 0, 0, 0.08);
+    }
+
+    :root.theme-light .btn-secondary {
+        background: #e5e7eb;
+        border-color: #d1d5db;
+        color: #374151;
+    }
+
+    :root.theme-light .btn-secondary:hover {
+        background: #d1d5db;
+        border-color: #9ca3af;
+    }
+
+    /* ── Responsive ── */
+    @@media (max-width: 480px) {
+        .login-card {
+            padding: 2.25rem 1.5rem 2rem;
+            margin: 1rem;
+            border-radius: var(--radius-md);  /* 12px — matches system token */
+        }
+
+        .login-modal {
+            margin: 1rem;
+            max-width: calc(100% - 2rem);
+        }
+    }
+
+    /* ── X close button ── */
+    .login-close-btn {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-sm);
+        /* 8px — matches system token */
+        border: 1.5px solid var(--accent, #ff7a00);
+        background: transparent;
+        color: var(--accent, #ff7a00);
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition: box-shadow 0.2s ease, transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+        line-height: 1;
+    }
+
+    .login-close-btn:hover {
+        transform: translateY(-2px);
+        box-shadow:
+            0 0 12px rgba(255, 122, 0, 0.30),
+            0 0 24px rgba(255, 122, 0, 0.15);
+        border-color: #ffa040;
+        color: #ffa040;
+        background: rgba(255, 122, 0, 0.10);
+    }
+
+    .login-close-btn:active {
+        transform: scale(0.96);
+    }
+
+    .login-close-btn:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.55);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 3px rgba(27, 119, 210, 0.12);
+    }
+
+    /* ── Brand header ── */
+    .login-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        margin-bottom: 1.25rem;
+    }
+
+    /* ── Brand logo SVG ── */
+    .login-logo-svg {
+        width: 72px;
+        height: 48px;
+        margin-bottom: 0.5rem;
+        filter: drop-shadow(0 0 10px rgba(255, 122, 0, 0.45));
+        transition: filter 0.25s ease;
+    }
+
+    .login-logo-svg:hover {
+        filter: drop-shadow(0 0 16px rgba(255, 122, 0, 0.70));
+    }
+
+    .login-title {
+        font-weight: 700;
+        font-size: 1.6rem;
+        margin: 0 0 0.15rem;
+        color: var(--accent);
+        font-family: var(--font-brand, 'Inter', 'Poppins', sans-serif);
+    }
+
+    .login-subtitle {
+        font-size: 0.85rem;
+        margin: 0 0 0.25rem;
+        color: var(--brand-blue);
+        /* matches NavMenu brand subtitle */
+    }
+
+    /* ── Forgot password appear animation ── */
+    .login-recovery-animated {
+        animation: loginRecoveryFadeIn 0.3s ease-out both;
+    }
+
+    @@keyframes loginRecoveryFadeIn {
+        from {
+            opacity: 0;
+            transform: translateX(8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    /* ── Password input group con toggle ojo ── */
+    .login-input-group {
+        position: relative;
+    }
+
+    .login-input-pwd {
+        padding-right: 3rem !important;
+    }
+
+    .login-pwd-toggle {
+        position: absolute;
+        right: 2px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        border-radius: var(--radius-sm);  /* 8px — matches system token */
+        padding: 0;
+        z-index: 5;
+        transition: color 0.18s ease, filter 0.18s ease;
+        line-height: 1;
+    }
+
+    .login-pwd-toggle:hover {
+        color: #ff8f00;
+        filter: drop-shadow(0 0 5px rgba(255, 143, 0, 0.55));
+        background: transparent;
+    }
+
+    .login-pwd-toggle:active {
+        color: #e06c00;
+    }
+
+    .login-pwd-toggle:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.50);
+        outline-offset: 1px;
+    }
+
+    .login-pwd-toggle i {
+        font-size: 1.05rem;
+        pointer-events: none;
+        display: block;
+    }
+
+    .login-heading {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    /* ── CTA register / back-to-login ── */
+    .login-cta {
+        font-size: 0.83rem;
+        margin: 0;
+    }
+
+    .login-cta-link {
+        color: var(--accent);
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        border: none;
+        border-bottom: 1px solid transparent;
+        background: none;
+        padding: 0;
+        font-size: inherit;
+        font-family: inherit;
+        transition: border-color 0.18s ease, color 0.18s ease;
+    }
+
+    .login-cta-link:hover {
+        color: #e06c00;
+        border-bottom-color: #e06c00;
+    }
+
+    .login-cta-link:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.18);
+    }
+
+    .login-optional {
+        font-size: 0.75rem;
+        font-weight: 400;
+        opacity: 0.65;
+    }
+
+    /* ── Primary button ── */
+    .login-btn {
+        background: linear-gradient(135deg, var(--accent) 0%, #e06500 100%);
+        color: #fff;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius-sm);
+        /* 8px — matches system .btn */
+        padding: 0.65rem;
+        font-size: 1rem;
+        transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.18s ease;
+        box-shadow: 0 4px 14px var(--accent-glow);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .login-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, #ff8f1a 0%, var(--accent) 100%);
+        box-shadow: 0 6px 20px var(--accent-glow);
+        color: #fff;
+        transform: translateY(-2px);
+    }
+
+    .login-btn:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .login-btn:disabled {
+        opacity: 0.45;
+        /* matches system .btn:disabled */
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    /* ═══════════════════════════════════════════
+       DARK THEME
+    ═══════════════════════════════════════════ */
+    :root.theme-dark .login-wrapper {
+        background: #0f1226;
+    }
+
+    :root.theme-dark .login-card {
+        background: #162041;
+        border: 1px solid var(--border-soft);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
+    }
+
+    :root.theme-dark .login-heading {
+        color: #cbd5e1;
+    }
+
+    /* .login-subtitle dark handled by base rule — var(--brand-blue) */
+
+    :root.theme-dark .login-label {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    :root.theme-dark .login-input {
+        background: #0f172a;
+        border: 1px solid #334155;
+        color: #f3f4f6;
+        border-radius: var(--radius-sm);  /* 8px */
+        transition: border-color 0.2s ease;
+    }
+
+    :root.theme-dark .login-input:hover {
+        border-color: #475569;
+    }
+
+    :root.theme-dark .login-input::placeholder {
+        color: #475569;
+    }
+
+    :root.theme-dark .login-input:focus {
+        background: #0f172a;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.2rem rgba(255, 122, 0, 0.25);
+        color: #f3f4f6;
+        outline: none;
+    }
+
+    :root.theme-dark .login-input.input-error {
+        border-color: var(--state-error);
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    }
+
+    :root.theme-dark .login-cta {
+        color: #64748b;
+    }
+
+    :root.theme-dark .login-optional {
+        color: #475569;
+    }
+
+    :root.theme-dark .login-close-btn {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+    /* ═══════════════════════════════════════════
+       LIGHT THEME
+    ═══════════════════════════════════════════ */
+    :root.theme-light .login-wrapper {
+        background: #eef0f5;
+    }
+
+    :root.theme-light .login-card {
+        background: #ffffff;
+        border: 1px solid var(--border-soft);
+        box-shadow: 0 4px 28px rgba(0, 0, 0, 0.09);
+    }
+
+    :root.theme-light .login-heading {
+        color: #6b7280;
+    }
+
+    /* .login-subtitle light handled by base rule — var(--brand-blue) */
+
+    :root.theme-light .login-label {
+        color: #374151;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    :root.theme-light .login-input {
+        background: #f9fafb;
+        border: 1px solid #d1d5db;
+        color: #1f2937;
+        border-radius: var(--radius-sm);  /* 8px */
+        transition: border-color 0.2s ease;
+    }
+
+    :root.theme-light .login-input:hover {
+        border-color: #b0b7c3;
+    }
+
+    :root.theme-light .login-input::placeholder {
+        color: #9ca3af;
+    }
+
+    :root.theme-light .login-input:focus {
+        background: #fff;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 0.2rem rgba(255, 122, 0, 0.18);
+        color: #1f2937;
+        outline: none;
+    }
+
+    :root.theme-light .login-input.input-error {
+        border-color: var(--state-error);
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.20);
+    }
+
+    :root.theme-light .login-cta {
+        color: #9ca3af;
+    }
+
+    :root.theme-light .login-optional {
+        color: #9ca3af;
+    }
+
+    :root.theme-light .login-close-btn {
+        border-color: var(--brand-blue);
+        color: var(--brand-blue);
+    }
+
+    :root.theme-light .login-recovery-link {
+        color: var(--accent);
+    }
+
+    :root.theme-light .login-modal-header {
+        border-bottom-color: rgba(0, 0, 0, 0.1);
+        color: #374151;
+    }
+
+    :root.theme-light .login-modal-footer {
+        border-top-color: rgba(0, 0, 0, 0.08);
+    }
+
+    :root.theme-light .btn-secondary {
+        background: #e5e7eb;
+        border-color: #d1d5db;
+        color: #374151;
+    }
+
+    :root.theme-light .btn-secondary:hover {
+        background: #d1d5db;
+        border-color: #9ca3af;
+    }
+
+    /* ── Responsive ── */
+    @@media (max-width: 480px) {
+        .login-card {
+            padding: 2.25rem 1.5rem 2rem;
+            margin: 1rem;
+            border-radius: var(--radius-md);  /* 12px — matches system token */
+        }
+
+        .login-modal {
+            margin: 1rem;
+            max-width: calc(100% - 2rem);
+        }
+    }
+</style>
+
+@code {
+    // ── Login state ──
+    private string username = "";
+    private string password = "";
+    private string errorMessage = "";
+    private bool isLoading = false;
+    private bool showForgotPassword = false;
+    private bool showPassword = false; // toggle ver/ocultar contraseña
+    private ElementReference usernameInput;
+    private ElementReference forgotPasswordBtn;
+    private ElementReference recoveryModal;
+
+    // ── Register state ──
+    private bool showRegister = false;
+    private string regUsername = "";
+    private string regEmail = "";
+    private string regPassword = "";
+    private string regConfirm = "";
+    private string regError = "";
+    private string regSuccess = "";
+    private bool isRegisterLoading = false;
+
+    // ── Password Recovery state ──
+    private bool showPasswordRecoveryModal = false;
+    private string recoveryUsername = "";
+    private string recoveryError = "";
+    private string recoverySuccess = "";
+    private bool isRecoveryLoading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("themeManager.applyTheme",
+                await JS.InvokeAsync<string>("themeManager.getTheme"));
+
+            // Auto-focus on username field for better UX
+            try
+            {
+                await usernameInput.FocusAsync();
+            }
+            catch { /* non-critical */ }
+        }
+
+        // Wire modal focus trap when it becomes visible
+        if (showPasswordRecoveryModal)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("loginAccessibility.open",
+                    "recovery-modal", "forgot-password-btn");
+            }
+            catch { /* non-critical */ }
+        }
+    }
+
+    // ── LOGIN ──
+
+    private async Task DoLogin()
+    {
+        // Trim antes de validar — evita falsos negativos por espacios accidentales
+        username = username.Trim();
+        password = password.Trim();
+        errorMessage = "";
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Completá usuario y contraseña.";
+            return;
+        }
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var user = await AuthSvc.ValidateAsync(username.Trim(), password);
+
+            if (user is null)
+            {
+                errorMessage = "Usuario o contraseña incorrectos.";
+                showForgotPassword = true;
+                isLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Login correcto: limpiar estado de error
+            errorMessage = "";
+            showForgotPassword = false;
+
+            Console.WriteLine($"[Login] Login exitoso para: {user.Username}");
+
+            // Establecer sesión en memoria (AuthStateService es Scoped — vive en el circuito actual)
+            AuthStateSvc.Login(user);
+
+            // Guardar nombre de usuario en localStorage SOLO para mostrar en el header
+            // NO se usa para autenticación — el auth vive únicamente en memoria
+            // Timestamp en ms desde epoch Unix (compatible con Date.now() en JS)
+            await JS.InvokeVoidAsync("sessionManager.setUser", new
+            {
+                id = user.Id,
+                username = user.Username,
+                email = user.Email ?? string.Empty,
+                role = user.Role,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            });
+
+            // Navegación del lado del cliente — mantiene el circuito Blazor activo
+            // NO usar forceLoad: true (eso destruiría el circuito y la sesión en memoria)
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Login] Error: {ex.Message}");
+            errorMessage = "Error durante el inicio de sesión. Intentá de nuevo.";
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void GoHome() => Nav.NavigateTo("/");
+
+    private void TogglePassword() => showPassword = !showPassword;
+
+    // ── REGISTER ──
+
+    private void OpenRegister()
+    {
+        regError = regSuccess = "";
+        regUsername = regEmail = regPassword = regConfirm = "";
+        showForgotPassword = false;
+        showRegister = true;
+    }
+
+    private void CloseRegister()
+    {
+        showRegister = false;
+        errorMessage = "";
+        showForgotPassword = false;
+    }
+
+    private async Task DoRegister()
+    {
+        regError = regSuccess = "";
+
+        if (string.IsNullOrWhiteSpace(regUsername) || string.IsNullOrWhiteSpace(regPassword))
+        {
+            regError = "Completá al menos usuario y contraseña.";
+            return;
+        }
+
+        if (regPassword != regConfirm)
+        {
+            regError = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        if (regPassword.Length < 6)
+        {
+            regError = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        isRegisterLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var (ok, error) = await AuthSvc.RegisterAsync(regUsername.Trim(), regPassword, regEmail);
+
+            if (!ok)
+            {
+                regError = error;
+                isRegisterLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            regSuccess = "¡Cuenta creada! Iniciando sesión...";
+            StateHasChanged();
+            await Task.Delay(900);
+
+            // Usar ValidateAsync para obtener el usuario con su ID real (evita id=0)
+            var newUser = await AuthSvc.ValidateAsync(regUsername.Trim(), regPassword);
+            if (newUser is not null)
+            {
+                Console.WriteLine($"[Login] Registro exitoso para: {newUser.Username} (Id={newUser.Id})");
+
+                // Establecer sesión en memoria
+                AuthStateSvc.Login(newUser);
+
+                // Guardar en localStorage SOLO para display en header
+                await JS.InvokeVoidAsync("sessionManager.setUser", new
+                {
+                    id = newUser.Id,
+                    username = newUser.Username,
+                    email = newUser.Email ?? string.Empty,
+                    role = newUser.Role,
+                    timestamp = DateTime.UtcNow.Ticks
+                });
+            }
+
+            // Navegación del lado del cliente — mantiene el circuito y la sesión en memoria
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Login] Error en registro: {ex.Message}");
+            regError = "Error durante el registro. Intentá de nuevo.";
+            isRegisterLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── PASSWORD RECOVERY ──
+
+    private void OpenPasswordRecovery()
+    {
+        recoveryUsername = "";
+        recoveryError = "";
+        recoverySuccess = "";
+        showPasswordRecoveryModal = true;
+    }
+
+    private async Task ClosePasswordRecovery()
+    {
+        await JS.InvokeVoidAsync("loginAccessibility.close");
+        showPasswordRecoveryModal = false;
+    }
+
+    private async Task SubmitRecovery()
+    {
+        recoveryError = "";
+        recoverySuccess = "";
+
+        if (string.IsNullOrWhiteSpace(recoveryUsername))
+        {
+            recoveryError = "Ingresá tu nombre de usuario.";
+            return;
+        }
+
+        isRecoveryLoading = true;
+        StateHasChanged();
+
+        await Task.Delay(1000); // Simulate API call
+
+        recoverySuccess = "Te hemos enviado un enlace de recuperación al email asociado. Revisa tu bandeja de entrada.";
+        isRecoveryLoading = false;
+        StateHasChanged();
+
+        await Task.Delay(2500);
+        ClosePasswordRecovery();
+    }
+}

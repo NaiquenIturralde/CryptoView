@@ -1,0 +1,845 @@
+@implements IDisposable
+@inject NotificationService NotificationSvc
+@inject IJSRuntime JS
+@using System.Text.Json
+
+<div class="notif-wrapper" @onkeydown="OnWrapperKeyDown">
+
+    <button class="notif-bell-btn @(isOpen ? "notif-bell-btn--raised" : "")" @onclick="ToggleDropdown"
+            @onclick:stopPropagation="true" aria-label="Notificaciones" aria-expanded="@isOpen.ToString().ToLower()"
+            aria-haspopup="true">
+        <i class="bi bi-bell fs-5"></i>
+        @if (NotificationSvc.UnreadCount > 0)
+        {
+            <span class="notification-badge @(_pulseActive ? "has-notifications" : "")"
+                  aria-label="@NotificationSvc.UnreadCount notificaciones no leídas" aria-live="polite">
+                @(NotificationSvc.UnreadCount > 9 ? "9+" : NotificationSvc.UnreadCount.ToString())
+            </span>
+        }
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="notif-backdrop" @onclick="CloseDropdown" aria-hidden="true"></div>
+
+        <div class="notif-panel" role="dialog" aria-label="Panel de notificaciones" aria-modal="true">
+            <div class="notif-panel-header">
+                <span class="notif-title">Notificaciones</span>
+                <div class="notif-header-actions">
+                    @if (NotificationSvc.UnreadCount > 0)
+                    {
+                        <button class="notif-mark-all-btn" @onclick="() => NotificationSvc.MarkAllAsRead()"
+                                @onclick:stopPropagation="true">
+                            Marcar todas
+                        </button>
+                    }
+                    @if (NotificationSvc.All.Any())
+                    {
+                        <button class="notif-clear-btn" @onclick="ClearAllAsync" @onclick:stopPropagation="true"
+                                title="Limpiar todas las notificaciones" aria-label="Limpiar notificaciones">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @if (!NotificationSvc.All.Any())
+            {
+                <div class="notif-empty">
+                    <i class="bi bi-bell-slash"></i>
+                    <span>No hay notificaciones por el momento</span>
+                </div>
+            }
+            else
+            {
+                <ul class="notif-list" role="list">
+                    @foreach (var notif in NotificationSvc.All)
+                    {
+                        var n = notif;
+                        <li class="notif-item @(n.IsRead ? "read" : "unread")" @onclick="() => OpenModal(n)"
+                            @onclick:stopPropagation="true" @onkeydown="(e) => OnItemKeyDown(e, n)" tabindex="0" role="button"
+                            aria-label="@n.Title — @n.Message">
+                            <div class="notif-icon-wrap notif-icon-@n.TypeName">
+                                <i class="bi @n.IconClass"></i>
+                            </div>
+                            <div class="notif-content">
+                                <div class="notif-item-title">@n.Title</div>
+                                <div class="notif-item-desc">@n.Message</div>
+                                <div class="notif-item-time">@FormatTimestamp(n.CreatedAt)</div>
+                            </div>
+                            @if (!n.IsRead)
+                            {
+                                <span class="notif-dot" aria-hidden="true"></span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
+</div>
+
+<style>
+    /* === Notification Bell Button === */
+    .notif-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        /* No z-index here — avoids creating a stacking context that would
+           trap the dropdown below the sidebar or clip the modal. */
+    }
+
+    .notif-bell-btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .notif-bell-btn:hover {
+        background: rgba(255, 122, 0, 0.10);
+        border-color: rgba(255, 122, 0, 0.30);
+        color: #ff7a00;
+    }
+
+    .notif-bell-btn:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.55);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba(27, 119, 210, 0.10);
+    }
+
+    .notif-bell-btn[aria-expanded="true"] {
+        background: rgba(255, 122, 0, 0.12);
+        border-color: rgba(255, 122, 0, 0.35);
+        color: #ff7a00;
+    }
+
+    /* ── Botón elevado sobre el backdrop cuando el panel está abierto ── */
+    .notif-bell-btn--raised {
+        position: relative;
+        z-index: 2021;
+    }
+
+    /* === Badge === */
+    .notification-badge {
+        position: absolute;
+        top: -4px;
+        right: -5px;
+        width: auto;
+        min-width: unset;
+        height: auto;
+        padding: 0;
+        background: transparent;
+        background-color: transparent;
+        color: #ff7a00;
+        font-size: 8px;
+        font-weight: 700;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        display: block;
+        line-height: 1;
+        pointer-events: none;
+        letter-spacing: 0;
+    }
+
+    .notification-badge::before,
+    .notification-badge::after {
+        display: none;
+        content: none;
+    }
+
+    .notification-badge.has-notifications {
+        animation: notificationPulse 1.2s ease-in-out 2;
+    }
+
+    @@keyframes notificationPulse {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.25);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .notification-badge.has-notifications {
+            animation: none;
+        }
+    }
+
+    /* === Backdrop (click-outside catcher) === */
+    .notif-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 2010;
+        background: transparent;
+        cursor: default;
+    }
+
+    /* === Panel (dropdown) — position:fixed escapes .top-row stacking context === */
+    .notif-panel {
+        position: fixed;
+        top: 68px;
+        /* .top-row height (60px) + 8px gap */
+        right: 12px;
+        width: 320px;
+        max-height: 400px;
+        background: var(--bg-card, #1A2236);
+        border: 1px solid var(--border-soft);
+        border-radius: 12px;
+        box-shadow:
+            0 12px 36px rgba(0, 0, 0, 0.35),
+            0 0 0 1px rgba(255, 122, 0, 0.07);
+        z-index: 2020;
+        overflow: hidden;
+        animation: notifSlideIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── Mobile: full-width, taller, adjusted spacing ── */
+    @@media (max-width: 768px) {
+        .notif-panel {
+            left: 12px;
+            right: 12px;
+            width: auto;
+            max-width: none;
+            max-height: 75vh;
+            border-radius: 14px;
+        }
+
+        .notif-list {
+            max-height: calc(75vh - 90px);
+        }
+
+        .notif-empty {
+            padding: 36px 20px;
+        }
+
+        .notif-item {
+            padding: 10px 14px;
+        }
+
+        .notif-item-title {
+            font-size: 13px;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: unset;
+        }
+
+        .notif-item-desc {
+            font-size: 12px;
+            -webkit-line-clamp: 2;
+        }
+    }
+
+    @@keyframes notifSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-8px) scale(0.97);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    /* === Panel Header === */
+    .notif-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 12px 8px;
+        border-bottom: 1px solid var(--border-soft);
+        background: rgba(255, 122, 0, 0.02);
+    }
+
+    .notif-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+
+    /* Actions group: wraps "Marcar todas" + trash */
+    .notif-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .notif-mark-all-btn {
+        font-size: 10px;
+        font-weight: 600;
+        color: #ff7a00;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.15s ease, color 0.15s ease;
+        letter-spacing: 0.1px;
+    }
+
+    .notif-mark-all-btn:hover {
+        background: rgba(255, 122, 0, 0.12);
+        color: #ffa040;
+    }
+
+    .notif-mark-all-btn:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.50);
+        outline-offset: 2px;
+    }
+
+    .notif-clear-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        font-size: 12px;
+        color: rgba(156, 163, 175, 0.55);
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .notif-clear-btn:hover {
+        background: rgba(229, 57, 53, 0.12);
+        color: #e53935;
+        border-color: rgba(229, 57, 53, 0.25);
+    }
+
+    .notif-clear-btn:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.50);
+        outline-offset: 2px;
+    }
+
+    /* === Notification List === */
+    .notif-list {
+        list-style: none;
+        margin: 0;
+        padding: 3px 0;
+        overflow-y: auto;
+        max-height: 310px;
+    }
+
+    .notif-list::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .notif-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .notif-list::-webkit-scrollbar-thumb {
+        background: rgba(255, 122, 0, 0.25);
+        border-radius: 4px;
+    }
+
+    .notif-list::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 122, 0, 0.45);
+    }
+
+    /* === Notification Items === */
+    .notif-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        position: relative;
+        outline: none;
+        border-bottom: 1px solid var(--border-soft);
+    }
+
+    .notif-item:last-child {
+        border-bottom: none;
+    }
+
+    .notif-item:hover {
+        background: rgba(255, 122, 0, 0.06);
+    }
+
+    .notif-item:focus-visible {
+        background: rgba(27, 119, 210, 0.10);
+        box-shadow: inset 0 0 0 2px rgba(27, 119, 210, 0.40);
+    }
+
+    .notif-item.unread {
+        background: rgba(255, 122, 0, 0.045);
+    }
+
+    .notif-item.unread:hover {
+        background: rgba(255, 122, 0, 0.085);
+    }
+
+    /* === Icon === */
+    .notif-icon-wrap {
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        margin-top: 1px;
+    }
+
+    .notif-icon-success {
+        background: rgba(76, 175, 80, 0.18);
+        color: #4caf50;
+    }
+
+    .notif-icon-warning {
+        background: rgba(255, 122, 0, 0.18);
+        color: #ff7a00;
+    }
+
+    .notif-icon-danger {
+        background: rgba(229, 57, 53, 0.18);
+        color: #e53935;
+    }
+
+    .notif-icon-info {
+        background: rgba(27, 119, 210, 0.18);
+        color: #1b77d2;
+    }
+
+    /* === Content === */
+    .notif-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notif-item-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        line-height: 1.3;
+        margin-bottom: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .notif-item.read .notif-item-title {
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .notif-item-desc {
+        font-size: 11px;
+        color: var(--text-secondary);
+        line-height: 1.35;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+    }
+
+    .notif-item-time {
+        font-size: 10px;
+        color: var(--text-secondary);
+        opacity: 0.6;
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* === Unread dot === */
+    .notif-dot {
+        flex-shrink: 0;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ff7a00;
+        margin-top: 5px;
+        align-self: flex-start;
+    }
+
+    /* === Empty State === */
+    .notif-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 28px 16px;
+        gap: 7px;
+        color: var(--text-secondary);
+    }
+
+    .notif-empty i {
+        font-size: 26px;
+        opacity: 0.30;
+    }
+
+    .notif-empty span {
+        font-size: 12px;
+        text-align: center;
+        opacity: 0.65;
+    }
+
+    /* === Notification Detail Modal === */
+    .notif-modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2050;
+        background: rgba(0, 0, 0, 0.60);
+        backdrop-filter: blur(3px);
+        animation: notifOverlayIn 0.18s ease;
+    }
+
+    @@keyframes notifOverlayIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .notif-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2051;
+        width: min(440px, 90vw);
+        max-height: 80vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-card, #1A2236);
+        border: 1px solid var(--border-soft);
+        border-radius: 14px;
+        box-shadow:
+            0 24px 60px rgba(0, 0, 0, 0.55),
+            0 0 0 1px rgba(255, 122, 0, 0.08);
+        outline: none;
+        animation: notifModalIn 0.20s cubic-bezier(0.34, 1.36, 0.64, 1);
+    }
+
+    @@keyframes notifModalIn {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.90);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+    }
+
+    /* Header stripe colored by type */
+    .notif-modal-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 18px 14px;
+        border-bottom: 1px solid var(--border-soft);
+        border-radius: 14px 14px 0 0;
+    }
+
+    .notif-modal-type-success {
+        background: rgba(76, 175, 80, 0.10);
+    }
+
+    .notif-modal-type-warning {
+        background: rgba(255, 122, 0, 0.10);
+    }
+
+    .notif-modal-type-danger {
+        background: rgba(229, 57, 53, 0.10);
+    }
+
+    .notif-modal-type-info {
+        background: rgba(27, 119, 210, 0.10);
+    }
+
+    .notif-modal-icon {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+
+    .notif-modal-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary, #E5E7EB);
+        margin: 0;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    /* Body — scrollable if content is long */
+    .notif-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px 18px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .notif-modal-body::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .notif-modal-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .notif-modal-body::-webkit-scrollbar-thumb {
+        background: rgba(255, 122, 0, 0.25);
+        border-radius: 4px;
+    }
+
+    .notif-modal-body::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 122, 0, 0.45);
+    }
+
+    .notif-modal-message {
+        font-size: 13px;
+        color: var(--text-primary, #E5E7EB);
+        line-height: 1.6;
+        margin: 0;
+        word-break: break-word;
+        white-space: pre-wrap;
+    }
+
+    .notif-modal-time {
+        font-size: 11px;
+        color: var(--text-secondary, #9CA3AF);
+        opacity: 0.75;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Footer */
+    .notif-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        padding: 10px 18px 14px;
+        border-top: 1px solid var(--border-soft);
+    }
+
+    .notif-modal-close-btn {
+        padding: 7px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary, #E5E7EB);
+        background: rgba(255, 122, 0, 0.12);
+        border: 1px solid rgba(255, 122, 0, 0.30);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .notif-modal-close-btn:hover {
+        background: rgba(255, 122, 0, 0.22);
+        border-color: rgba(255, 122, 0, 0.55);
+        color: #ffa040;
+    }
+
+    .notif-modal-close-btn:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.55);
+        outline-offset: 2px;
+    }
+</style>
+
+@code {
+    private bool isOpen = false;
+    private bool _pulseActive = false;
+    private int _previousUnreadCount = 0;
+
+    // Guardamos si la carga inicial desde localStorage ya terminó,
+    // para no intentar guardar antes de haber cargado.
+    private bool _storageReady = false;
+
+    private static readonly JsonSerializerOptions _jsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = false
+    };
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+
+    protected override void OnInitialized()
+    {
+        _previousUnreadCount = NotificationSvc.UnreadCount;
+        NotificationSvc.OnChanged += HandleNotificationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadFromStorageAsync();
+    }
+
+    /// <summary>
+    /// Handler del evento OnChanged del servicio.
+    /// Re-renderiza el componente y, una vez que la carga inicial terminó,
+    /// persiste el estado actual en localStorage.
+    /// </summary>
+    private async void HandleNotificationChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            var current = NotificationSvc.UnreadCount;
+            if (current > _previousUnreadCount)
+            {
+                _pulseActive = true;
+                StateHasChanged();
+                // Remove the class after the animation completes (1.2s * 2 runs = 2.4s)
+                // so it can be re-applied on the next change.
+                _ = Task.Delay(2500).ContinueWith(_ => InvokeAsync(() =>
+                {
+                    _pulseActive = false;
+                    StateHasChanged();
+                }));
+            }
+            else
+            {
+                StateHasChanged();
+            }
+            _previousUnreadCount = current;
+            if (_storageReady)
+                await SaveToStorageAsync();
+        });
+    }
+
+    public void Dispose()
+    {
+        NotificationSvc.OnChanged -= HandleNotificationChanged;
+    }
+
+    // ── Persistencia localStorage ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Lee las notificaciones guardadas en localStorage y las carga en el
+    /// servicio. Llamado una sola vez en el primer render (cuando IJSRuntime
+    /// ya está disponible). Si el JSON está corrupto, se inicia con lista vacía.
+    /// </summary>
+    private async Task LoadFromStorageAsync()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("notificationStore.load");
+
+            if (!string.IsNullOrWhiteSpace(json) && json != "[]")
+            {
+                var stored = JsonSerializer.Deserialize<List<AppNotification>>(json, _jsonOpts);
+                if (stored is { Count: > 0 })
+                    NotificationSvc.LoadFromStorage(stored);
+            }
+        }
+        catch
+        {
+            // localStorage inaccesible o JSON corrupto — fallback a lista vacía
+        }
+        finally
+        {
+            _storageReady = true;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>
+    /// Serializa la lista actual y la guarda en localStorage.
+    /// Los errores de escritura son no fatales.
+    /// </summary>
+    private async Task SaveToStorageAsync()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(NotificationSvc.All, _jsonOpts);
+            await JS.InvokeVoidAsync("notificationStore.save", json);
+        }
+        catch
+        {
+            // Ignorar errores de localStorage (modo incógnito, cuota llena, etc.)
+        }
+    }
+
+    /// <summary>Elimina todas las notificaciones en memoria y en localStorage.</summary>
+    private Task ClearAllAsync()
+    {
+        // ClearAll() dispara OnChanged → HandleNotificationChanged → SaveToStorageAsync
+        // con lista vacía, lo que equivale a limpiar el storage automáticamente.
+        NotificationSvc.ClearAll();
+        return Task.CompletedTask;
+    }
+
+    // ── Interacción ──────────────────────────────────────────────────────────
+
+    private void ToggleDropdown()
+    {
+        isOpen = !isOpen;
+        StateHasChanged();
+    }
+
+    private void CloseDropdown()
+    {
+        isOpen = false;
+        StateHasChanged();
+    }
+
+    // Close the dropdown first, then delegate to the service.
+    // NotificationSvc.OpenModal marks as read, sets SelectedNotification,
+    // and fires OnModalChanged — which MainLayout handles to show the modal.
+    private void OpenModal(AppNotification n)
+    {
+        isOpen = false;
+        NotificationSvc.OpenModal(n);
+    }
+
+    private void OnItemKeyDown(KeyboardEventArgs e, AppNotification item)
+    {
+        if (e.Key is "Enter" or " ")
+            OpenModal(item);
+    }
+
+    private void OnWrapperKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            CloseDropdown();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static string FormatTimestamp(DateTime createdAt)
+    {
+        var diff = DateTime.Now - createdAt;
+        if (diff.TotalSeconds < 60) return "hace un momento";
+        if (diff.TotalMinutes < 60) return $"hace {(int)diff.TotalMinutes} min";
+        if (diff.TotalHours < 24) return $"hace {(int)diff.TotalHours} h";
+        return $"hace {(int)diff.TotalDays} d";
+    }
+
+}

@@ -1,0 +1,120 @@
+@* CryptoView Brand Loader — animated SVG eye *@
+
+<div class="cv-loader-wrapper @WrapperClass">
+    <div class="cv-loader-inner">
+        <!-- Eye SVG -->
+        <svg class="cv-loader-eye" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg"
+             aria-label="Cargando CryptoView" role="img">
+            <!-- Outer eye path (stroke animated) -->
+            <path class="cv-eye-outline"
+                  d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z"
+                  fill="none"
+                  stroke="#FF7A00"
+                  stroke-width="3.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  pathLength="314" />
+            <!-- Iris circle -->
+            <circle class="cv-iris" cx="60" cy="40" r="20"
+                    fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.5" />
+            <!-- Pupil (pulsing) -->
+            <circle class="cv-pupil" cx="60" cy="40" r="14"
+                    fill="#FF7A00" opacity="0.9" />
+            <!-- Chart line inside iris -->
+            <polyline class="cv-chart-line"
+                      points="44,44 52,36 58,42 66,32 76,38"
+                      fill="none"
+                      stroke="#fff"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      opacity="0.9" />
+        </svg>
+        @if (!string.IsNullOrEmpty(Text))
+        {
+            <p class="cv-loader-text">@Text</p>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Text displayed below the loader. Defaults to "Cargando CryptoView..."</summary>
+    [Parameter] public string Text { get; set; } = "Cargando CryptoView...";
+
+    /// <summary>Extra CSS classes for the wrapper (e.g. "cv-loader-fullpage")</summary>
+    [Parameter] public string WrapperClass { get; set; } = "";
+}
+
+<style>
+    .cv-loader-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem 1rem;
+        width: 100%;
+    }
+
+    .cv-loader-wrapper.cv-loader-fullpage {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: var(--bg-main);
+        padding: 0;
+    }
+
+    .cv-loader-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+        animation: cv-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .cv-loader-eye {
+        width: 96px;
+        height: 64px;
+        filter: drop-shadow(0 0 12px rgba(255, 122, 0, 0.55));
+    }
+
+    /* Outer eye stroke dash animation */
+    .cv-eye-outline {
+        stroke-dasharray: 314;
+        stroke-dashoffset: 314;
+        animation: cv-dash 1.6s ease-in-out infinite;
+    }
+
+    /* Pupil pulse */
+    .cv-pupil {
+        transform-origin: 60px 40px;
+        animation: cv-pupil-pulse-scale 1.6s ease-in-out infinite;
+    }
+
+    @@keyframes cv-pupil-pulse-scale {
+        0%, 100% { transform: scale(1);    opacity: 0.9; }
+        50%       { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* Chart line fade in/out */
+    .cv-chart-line {
+        stroke-dasharray: 60;
+        stroke-dashoffset: 60;
+        animation: cv-chart-draw 1.6s ease-in-out infinite;
+    }
+
+    @@keyframes cv-chart-draw {
+        0%   { stroke-dashoffset: 60; opacity: 0; }
+        40%  { stroke-dashoffset: 0;  opacity: 1; }
+        80%  { stroke-dashoffset: -60; opacity: 1; }
+        100% { stroke-dashoffset: -60; opacity: 0; }
+    }
+
+    .cv-loader-text {
+        font-family: var(--font-body, 'Inter', sans-serif);
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        letter-spacing: 0.03em;
+        margin: 0;
+        animation: pulse 1.6s ease-in-out infinite;
+    }
+</style>

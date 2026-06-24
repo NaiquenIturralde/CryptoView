@@ -1,0 +1,543 @@
+@page "/"
+@inject CryptoApiService ApiService
+@inject HttpClient Http
+@inject NotificationService NotificationSvc
+@inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Dashboard - CryptoView</PageTitle>
+
+<div class="page-container dashboard-container">
+    <!-- Header -->
+    <div class="dashboard-header mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h1 class="dashboard-title">Dashboard Principal</h1>
+                <p class="dashboard-subtitle">Monitoreo en tiempo real de criptomonedas</p>
+            </div>
+            <div>
+                <button class="btn btn-primary btn-lg" @onclick="RefreshAllPrices" disabled="@isLoading">
+                    <i class="bi bi-arrow-clockwise @(isLoading ? "spin" : "")"></i>
+                    @(isLoading ? "Actualizando..." : "Actualizar Precios")
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading && cryptos.Count == 0)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-3 text-light">Cargando criptomonedas...</p>
+        </div>
+    }
+    else if (cryptos.Count == 0)
+    {
+        <div class="empty-state text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <h3 class="mt-3 text-light">No hay criptomonedas en tu lista</h3>
+            <p class="text-muted">Comienza agregando tus criptomonedas favoritas</p>
+            <a href="/cryptolist" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle"></i> Agregar Criptomonedas
+            </a>
+        </div>
+    }
+    else
+    {
+        <!-- KPI Cards Grid -->
+        <div class="kpi-grid mb-4">
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-icon">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Total Monedas</span>
+                    <span class="kpi-value">@cryptos.Count</span>
+                </div>
+            </div>
+            <div class="kpi-card kpi-green">
+                <div class="kpi-icon">
+                    <i class="bi bi-arrow-up-circle"></i>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">En Alza</span>
+                    <span class="kpi-value">@cryptos.Count(c => c.Change24h > 0)</span>
+                </div>
+            </div>
+            <div class="kpi-card kpi-red">
+                <div class="kpi-icon">
+                    <i class="bi bi-arrow-down-circle"></i>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">En Baja</span>
+                    <span class="kpi-value">@cryptos.Count(c => c.Change24h < 0)</span>
+                </div>
+            </div>
+            <div class="kpi-card kpi-orange">
+                <div class="kpi-icon">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+                <div class="kpi-content">
+                    <span class="kpi-label">Cambio Promedio</span>
+                    <span class="kpi-value">@((cryptos.Any() ? cryptos.Average(c => c.Change24h) :
+                                                                                                                                                                                                                                                                                                                                                                    0).ToString("F2"))%</span>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-green">
+                    <div class="kpi-icon">
+                        <i class="bi bi-trophy"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Mayor Suba 24h</span>
+                        <span class="kpi-value">@GetTopGainer()</span>
+                    </div>
+                </div>
+                <div class="kpi-card kpi-red">
+                    <div class="kpi-icon">
+                        <i class="bi bi-exclamation-diamond"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <span class="kpi-label">Mayor Baja 24h</span>
+                        <span class="kpi-value">@GetTopLoser()</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crypto Cards Grid -->
+            <div class="row g-4">
+                @foreach (var crypto in cryptos.OrderByDescending(c => c.MarketCap))
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="crypto-card cv-card">
+                            <div class="crypto-header cv-card-header">
+                                <div class="crypto-name-group">
+                                    <h5 class="mb-0 cv-card-title-text">@crypto.Name</h5>
+                                    <small class="cv-card-subtitle-text">@crypto.Symbol.ToUpper()</small>
+                                </div>
+                                <div class="change-badge @(crypto.Change24h >= 0 ? "positive" : "negative")">
+                                    <i class="bi bi-@(crypto.Change24h >= 0 ? "arrow-up" : "arrow-down")"></i>
+                                    @crypto.Change24h.ToString("F2")%
+                                </div>
+                            </div>
+
+                            <div class="cv-card-body">
+                                <div class="crypto-price">
+                                    <h2 class="mb-0">$@crypto.CurrentPrice.ToString("N2")</h2>
+                                    <small class="text-muted">Precio actual USD</small>
+                                </div>
+
+                                <div class="crypto-details">
+                                    <div class="detail-row">
+                                        <span class="detail-label">
+                                            <i class="bi bi-cash-stack"></i> Market Cap
+                                        </span>
+                                        <span class="detail-value">$@FormatLargeNumber(crypto.MarketCap)</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">
+                                            <i class="bi bi-bar-chart"></i> Volumen 24h
+                                        </span>
+                                        <span class="detail-value">$@FormatLargeNumber(crypto.Volume24h)</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="detail-label">
+                                            <i class="bi bi-clock"></i> Última actualización
+                                        </span>
+                                        <span class="detail-value">@GetTimeAgo(crypto.LastUpdated)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (crypto.Notes.Any())
+                            {
+                                <div class="cv-card-footer crypto-notes">
+                                    <small class="text-info">
+                                        <i class="bi bi-sticky"></i> @crypto.Notes.Count nota(s)
+                                    </small>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Last Update Info -->
+        @if (lastUpdate.HasValue)
+        {
+            <div class="text-center mt-4 text-muted">
+                <small>
+                    <i class="bi bi-info-circle"></i>
+                    Última actualización: @lastUpdate.Value.ToString("dd/MM/yyyy HH:mm:ss")
+                </small>
+            </div>
+        }
+
+        <div class="app-author">
+            Desarrollado por Naiquen Iturralde ·
+
+        </div>
+    </div>
+
+    <style>
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @@keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ═══ KPI Cards ═══ */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+            align-items: stretch;
+        }
+
+        @@media (max-width: 1024px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @@media (max-width: 640px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .kpi-card {
+            background: var(--bg-card-gradient);
+            border: 1px solid var(--border-soft);
+            border-radius: 14px;
+            min-height: 110px;
+            padding: 1rem;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            transition: all 0.28s ease;
+            box-shadow: 0 4px 6px var(--shadow-soft);
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        .kpi-icon {
+            width: 42px;
+            height: 42px;
+            min-width: 42px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 11px;
+            flex-shrink: 0;
+        }
+
+        .kpi-blue .kpi-icon {
+            background: rgba(125, 249, 255, 0.20);
+            color: var(--color-blue);
+        }
+
+        .kpi-green .kpi-icon {
+            background: rgba(57, 255, 20, 0.18);
+            color: #39ff14;
+        }
+
+        .kpi-red .kpi-icon {
+            background: rgba(255, 99, 132, 0.18);
+            color: #ff6384;
+        }
+
+        .kpi-orange .kpi-icon {
+            background: rgba(235, 118, 18, 0.18);
+            color: #EB7612;
+        }
+
+        .kpi-content {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+
+        .kpi-label {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .kpi-value {
+            color: var(--color-yellow);
+            font-weight: 800;
+            font-size: 1.75rem;
+            line-height: 1;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .crypto-card {
+            background: var(--bg-card-gradient);
+            border: 1px solid var(--border-soft);
+            border-radius: 15px;
+            padding: 1.25rem 1.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px var(--shadow-soft);
+            --cv-card-min-height: 280px;
+        }
+
+        .crypto-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-shrink: 0;
+        }
+
+        .crypto-name-group {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .crypto-name-group .cv-card-title-text {
+            color: var(--color-yellow);
+            font-weight: 700;
+            font-size: 1.05rem;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .change-badge {
+            padding: 0.35rem 0.7rem;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .change-badge.positive {
+            background: rgba(57, 255, 20, 0.2);
+            color: #39ff14;
+        }
+
+        .change-badge.negative {
+            background: rgba(255, 99, 132, 0.2);
+            color: #ff6384;
+        }
+
+        .crypto-price h2 {
+            color: var(--color-blue);
+            font-weight: bold;
+            font-size: clamp(1.15rem, 2.5vw, 1.75rem);
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.2;
+        }
+
+        .crypto-details {
+            border-top: 1px solid var(--border-soft);
+            padding-top: 1rem;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.15rem 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.88rem;
+        }
+
+        .detail-label {
+            color: var(--text-secondary);
+            word-break: break-word;
+            min-width: 0;
+            flex-shrink: 1;
+            line-height: 1.4;
+        }
+
+        .detail-value {
+            color: var(--color-yellow);
+            font-weight: 500;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            min-width: 0;
+            text-align: right;
+            line-height: 1.4;
+        }
+
+        .app-author {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-subtle);
+            text-align: center;
+        }
+
+        .app-author a {
+            color: #b49fd5;
+            text-decoration: none;
+        }
+
+        .app-author a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Tablet: keep 4 KPI columns, 2-column crypto cards ── */
+        @@media (min-width: 992px) and (max-width: 1199px) {
+            .dashboard-container .row>.col-lg-4 {
+                flex: 0 0 auto;
+                width: 50%;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+    </style>
+
+@code {
+    private List<CryptoCurrency> cryptos = new();
+    private bool isLoading = false;
+    private DateTime? lastUpdate;
+
+    [Inject] private CryptoDbContext DbContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthStateSvc.IsAuthenticated())
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+        await LoadCryptoCurrencies();
+    }
+
+    private async Task LoadCryptoCurrencies()
+    {
+        try
+        {
+            isLoading = true;
+            cryptos = await DbContext.CryptoCurrencies
+                .Include(c => c.Notes)
+                .Where(c => c.IsActive)
+                .ToListAsync();
+            lastUpdate = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading cryptocurrencies: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshAllPrices()
+    {
+        if (cryptos.Count == 0) return;
+
+        try
+        {
+            isLoading = true;
+            var coinIds = cryptos.Select(c => c.CoinId.ToLower()).ToList();
+            var pricesData = await ApiService.GetMultipleCoinPricesAsync(coinIds);
+
+            int updated = 0;
+            foreach (var crypto in cryptos)
+            {
+                var priceData = pricesData.FirstOrDefault(p =>
+                    p.CoinId.Equals(crypto.CoinId, StringComparison.OrdinalIgnoreCase));
+
+                if (priceData != null)
+                {
+                    // Comparar precio almacenado vs nuevo para detectar variación real
+                    // entre actualizaciones. Debe llamarse ANTES de sobrescribir CurrentPrice.
+                    NotificationSvc.NotifyPriceAlert(crypto.Name, crypto.CurrentPrice, priceData.Price);
+
+                    crypto.CurrentPrice = priceData.Price;
+                    crypto.MarketCap = priceData.MarketCap;
+                    crypto.Volume24h = priceData.Volume24h;
+                    crypto.Change24h = priceData.Change24h;
+                    crypto.LastUpdated = priceData.LastUpdated;
+                    updated++;
+                }
+            }
+
+            await DbContext.SaveChangesAsync();
+            lastUpdate = DateTime.Now;
+
+            if (updated > 0)
+                NotificationSvc.NotifyPriceUpdateSuccess(updated);
+            else
+                NotificationSvc.NotifyPriceUpdateError();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error refreshing prices: {ex.Message}");
+            NotificationSvc.NotifyPriceUpdateError();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string FormatLargeNumber(decimal number)
+    {
+        if (number >= 1_000_000_000)
+            return $"{(number / 1_000_000_000):F2}B";
+        if (number >= 1_000_000)
+            return $"{(number / 1_000_000):F2}M";
+        if (number >= 1_000)
+            return $"{(number / 1_000):F2}K";
+        return number.ToString("N2");
+    }
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var timeSpan = DateTime.UtcNow - dateTime;
+
+        if (timeSpan.TotalMinutes < 1)
+            return "Hace un momento";
+        if (timeSpan.TotalMinutes < 60)
+            return $"Hace {(int)timeSpan.TotalMinutes} min";
+        if (timeSpan.TotalHours < 24)
+            return $"Hace {(int)timeSpan.TotalHours}h";
+        return $"Hace {(int)timeSpan.TotalDays}d";
+    }
+
+    private string GetTopGainer()
+    {
+        if (!cryptos.Any()) return "-";
+        var top = cryptos.OrderByDescending(c => c.Change24h).First();
+        return $"{top.Symbol.ToUpper()} +{top.Change24h:F2}%";
+    }
+
+    private string GetTopLoser()
+    {
+        if (!cryptos.Any()) return "-";
+        var bottom = cryptos.OrderBy(c => c.Change24h).First();
+        return $"{bottom.Symbol.ToUpper()} {bottom.Change24h:F2}%";
+    }
+}

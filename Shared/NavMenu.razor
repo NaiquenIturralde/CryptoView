@@ -1,0 +1,274 @@
+<div class="nav-menu">
+    <NavLink href="" Match="NavLinkMatch.All" class="sidebar-brand-link brand-link" @onclick="HandleNavClick">
+        <div class="sidebar-brand">
+            <svg class="brand-eye" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path class="brand-eye-outline"
+                      d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z"
+                      fill="none" stroke="#FF7A00" stroke-width="3.5"
+                      stroke-linecap="round" pathLength="314" />
+                <circle cx="60" cy="40" r="20" fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.4" />
+                <circle class="brand-eye-pupil" cx="60" cy="40" r="14" fill="#FF7A00" />
+                <polyline points="44,44 52,36 58,42 66,32 76,38"
+                          fill="none" stroke="#fff" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round"
+                          class="brand-eye-chart" />
+            </svg>
+            <div class="brand-name">CryptoView</div>
+            <div class="brand-subtitle">Dashboard Educativo</div>
+        </div>
+    </NavLink>
+    <hr class="sidebar-brand-separator" />
+
+    <nav class="sidebar-menu">
+        <NavLink class="sidebar-item" href="" Match="NavLinkMatch.All" @onclick="HandleNavClick">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </NavLink>
+
+        <NavLink class="sidebar-item" href="cryptolist" @onclick="HandleNavClick">
+            <i class="bi bi-list-ul"></i> Mis Criptomonedas
+        </NavLink>
+
+        <NavLink class="sidebar-item" href="stats" @onclick="HandleNavClick">
+            <i class="bi bi-graph-up-arrow"></i> Estadísticas
+        </NavLink>
+    </nav>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnNavigationRequested { get; set; }
+
+    private async Task HandleNavClick()
+    {
+        if (OnNavigationRequested.HasDelegate)
+        {
+            await OnNavigationRequested.InvokeAsync();
+        }
+    }
+}
+
+<style>
+    .nav-menu {
+        background: var(--bg-sidebar-gradient);
+        height: 100%;
+        box-shadow: 2px 0 10px var(--shadow-strong);
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .sidebar-brand-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        border-radius: 16px;
+        margin: 12px 10px 0;
+        transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+    }
+
+    .sidebar-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 12px 14px 10px;
+        text-align: center;
+    }
+
+    .sidebar-brand img {
+        display: block;
+        width: 100%;
+        max-width: 150px;
+        height: auto;
+        object-fit: contain;
+        margin: 0 auto;
+        transition: transform 0.25s ease, filter 0.25s ease;
+    }
+
+    .brand-name {
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.05;
+        color: #d97706;
+        letter-spacing: 0.2px;
+        margin: 0;
+    }
+
+    .brand-subtitle {
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.2;
+        color: #1b77d2;
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    .sidebar-brand-link:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 145, 0, 0.06);
+        box-shadow:
+            0 10px 24px rgba(255, 145, 0, 0.10),
+            0 0 18px rgba(255, 145, 0, 0.08);
+    }
+
+    .sidebar-brand-link:hover .sidebar-brand img {
+        transform: scale(1.04);
+        filter: drop-shadow(0 0 10px rgba(255, 145, 0, 0.20));
+    }
+
+    .sidebar-brand-link:hover .brand-name {
+        text-shadow: 0 0 12px rgba(255, 145, 0, 0.18);
+    }
+
+    .sidebar-brand-link:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.45);
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba(27, 119, 210, 0.10);
+    }
+
+    /* ── Brand Eye (ojo CryptoView) ─────────────────────────────────── */
+    .brand-link {
+        /* ensures the whole area is tappable on mobile */
+        display: block;
+    }
+
+    .brand-eye {
+        width: 64px;
+        height: 44px;
+        filter: drop-shadow(0 0 12px rgba(255,122,0,0.40));
+        transition: transform 0.3s ease, filter 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    .brand-eye-outline {
+        stroke-dasharray: 314;
+        stroke-dashoffset: 314;
+        transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease;
+    }
+
+    .brand-eye-pupil {
+        transform-origin: 60px 40px;
+        transition: transform 0.35s ease, fill 0.3s ease;
+    }
+
+    .brand-eye-chart {
+        stroke-dasharray: 60;
+        stroke-dashoffset: 60;
+        transition: stroke-dashoffset 0.5s ease;
+    }
+
+    /* Hover / tap: animación naranja */
+    .sidebar-brand-link:hover .brand-eye {
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 20px rgba(255,122,0,0.65));
+    }
+
+    .sidebar-brand-link:hover .brand-eye-outline {
+        stroke-dashoffset: 0;
+        stroke: #ff8f00;
+    }
+
+    .sidebar-brand-link:hover .brand-eye-pupil {
+        transform: scale(1.18);
+        fill: #ff8f00;
+    }
+
+    .sidebar-brand-link:hover .brand-eye-chart {
+        stroke-dashoffset: 0;
+    }
+
+    .sidebar-brand-link:active .brand-eye {
+        transform: scale(0.96);
+        transition: transform 0.1s ease;
+    }
+
+    /* Mobile: eye visible and tappable */
+    @@media (max-width: 640px) {
+        .brand-eye {
+            width: 56px;
+            height: 38px;
+        }
+    }
+
+    .sidebar-brand-separator {
+        margin: 12px 16px 16px;
+        border: none;
+        border-top: 1px solid rgba(255, 145, 0, 0.20);
+    }
+
+    .sidebar-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0 8px 16px;
+        overflow-y: auto;
+    }
+
+    .sidebar-menu::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar-menu::-webkit-scrollbar-thumb {
+        background: rgba(255, 145, 0, 0.15);
+        border-radius: 10px;
+    }
+
+    .sidebar-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-decoration: none;
+        transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    .sidebar-item i {
+        font-size: 18px;
+        color: var(--text-secondary);
+        transition: color 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .sidebar-item:hover {
+        background: rgba(255, 145, 0, 0.08);
+        color: #d97706;
+        transform: translateX(2px);
+    }
+
+    .sidebar-item:hover i {
+        color: #d97706;
+    }
+
+    .sidebar-item.active,
+    .sidebar-item[aria-current="page"] {
+        background: rgba(255, 145, 0, 0.12);
+        color: #d97706;
+        font-weight: 600;
+        box-shadow: 0 0 0 1px rgba(255, 145, 0, 0.15);
+    }
+
+    .sidebar-item.active i,
+    .sidebar-item[aria-current="page"] i {
+        color: #d97706;
+    }
+
+    .sidebar-item:focus-visible {
+        outline: 2px solid rgba(27, 119, 210, 0.4);
+        outline-offset: 2px;
+    }
+
+    @@keyframes pulse {
+
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.1);
+        }
+    }
+</style>

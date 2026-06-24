@@ -1,0 +1,181 @@
+@page "/preferencias"
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject CryptoView.Services.AuthStateService AuthStateSvc
+@using System.Text.Json
+
+<PageTitle>Preferencias - CryptoView</PageTitle>
+
+<div class="page-container preferences-container">
+    <!-- Page Header -->
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="display-5 fw-bold text-warning mb-1">Preferencias</h1>
+            <p class="text-muted lead mb-0">Configurá tu experiencia en CryptoView</p>
+        </div>
+    </div>
+
+    <!-- Tema -->
+    <div class="pref-card">
+        <div class="pref-card-title">
+            <i class="bi bi-palette"></i> Apariencia
+        </div>
+        <div class="pref-row">
+            <div>
+                <div class="pref-label">Tema oscuro</div>
+                <div class="pref-sublabel">Interfaz oscura optimizada para lectura de datos</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" checked="@isDark" @onchange="SaveTheme" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Preferencias de visualización -->
+    <div class="pref-card">
+        <div class="pref-card-title">
+            <i class="bi bi-sliders"></i> Preferencias de visualización
+        </div>
+        <div class="pref-row">
+            <div>
+                <div class="pref-label"><i class="bi bi-currency-exchange me-1"></i>Moneda preferida</div>
+                <div class="pref-sublabel">Los valores del dashboard se expresarán en esta moneda</div>
+            </div>
+            <CurrencySelect CssClass="preferences-currency-select" SelectedCurrency="@currency"
+                            SelectedCurrencyChanged="@(v => currency = v)" />
+        </div>
+    </div>
+
+    <!-- Notificaciones -->
+    <div class="pref-card">
+        <div class="pref-card-title">
+            <i class="bi bi-bell"></i> Notificaciones
+        </div>
+        <div class="pref-row">
+            <div>
+                <div class="pref-label">Alertas de precio</div>
+                <div class="pref-sublabel">Recibir avisos cuando una cripto suba o baje más del 5%</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" @bind="notifications" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-refresh -->
+    <div class="pref-card">
+        <div class="pref-card-title">
+            <i class="bi bi-arrow-repeat"></i> Actualización Automática
+        </div>
+        <div class="pref-row">
+            <div>
+                <div class="pref-label">Actualizar precios automáticamente</div>
+                <div class="pref-sublabel">Refresca los datos sin intervención manual</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" role="switch" @bind="autoRefresh" />
+            </div>
+        </div>
+        @if (autoRefresh)
+        {
+            <div class="pref-row mt-2">
+                <div>
+                    <div class="pref-label">Intervalo de actualización</div>
+                    <div class="pref-sublabel">¿Con qué frecuencia se consultan los precios?</div>
+                </div>
+                <select class="form-select form-select-sm w-auto" @bind="refreshInterval">
+                    <option value="1">Cada 1 minuto</option>
+                    <option value="5">Cada 5 minutos</option>
+                    <option value="10">Cada 10 minutos</option>
+                    <option value="30">Cada 30 minutos</option>
+                </select>
+            </div>
+        }
+    </div>
+
+    <!-- Save button + feedback -->
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <button class="btn btn-primary btn-lg" @onclick="SavePreferences">
+            <i class="bi bi-check-circle me-2"></i>Guardar cambios
+        </button>
+        @if (saved)
+        {
+            <div class="alert alert-success mb-0 py-2 px-3 d-flex align-items-center gap-2"
+                 style="border-radius: 10px; background: rgba(57,255,20,0.12); border-left: 4px solid #39ff14; color: #39ff14;">
+                <i class="bi bi-check-circle-fill"></i>
+                Preferencias guardadas correctamente.
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool isDark = true;
+    private string currency = "USD";
+    private bool notifications = true;
+    private bool autoRefresh = false;
+    private int refreshInterval = 5;
+    private bool saved = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AuthStateSvc.IsAuthenticated())
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var savedTheme = await JS.InvokeAsync<string>("themeManager.getTheme");
+            isDark = savedTheme != "light";
+            await JS.InvokeVoidAsync("themeManager.applyTheme", isDark ? "dark" : "light");
+
+            var dataJson = await JS.InvokeAsync<string?>("profileData.load");
+            if (!string.IsNullOrEmpty(dataJson))
+            {
+                try
+                {
+                    var d = JsonSerializer.Deserialize<ProfileDataDto>(dataJson);
+                    if (d != null && !string.IsNullOrWhiteSpace(d.Moneda))
+                        currency = d.Moneda;
+                }
+                catch { /* usa default */ }
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveTheme(ChangeEventArgs e)
+    {
+        isDark = (bool)(e.Value ?? true);
+        await JS.InvokeVoidAsync("themeManager.applyTheme", isDark ? "dark" : "light");
+    }
+
+    private async Task SavePreferences()
+    {
+        // Persist currency inside the shared profileData key (preserves all other fields)
+        var dataJson = await JS.InvokeAsync<string?>("profileData.load");
+        ProfileDataDto? existing = null;
+        if (!string.IsNullOrEmpty(dataJson))
+        {
+            try { existing = JsonSerializer.Deserialize<ProfileDataDto>(dataJson); }
+            catch { }
+        }
+        var updated = (existing ?? new ProfileDataDto(null, null, null, null, null, null, null, null, null))
+            with
+        { Moneda = currency };
+        await JS.InvokeVoidAsync("profileData.save", JsonSerializer.Serialize(updated));
+
+        saved = true;
+    }
+
+    private record ProfileDataDto(
+        string? Nombre, string? Apellido, string? Email, string? Username,
+        string? Bio, string? Pais, string? Moneda, string? AvatarIcon,
+        int[]? FavoriteCryptoIds);
+}

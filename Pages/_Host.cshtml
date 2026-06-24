@@ -1,0 +1,1005 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Web
+@namespace CryptoView.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <title>CryptoView Dashboard</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- CryptoView Typography: Inter + Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="css/site.css" rel="stylesheet" asp-append-version="true" />
+
+    <!-- Flatpickr date picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- chartjs-plugin-zoom: zoom con rueda del mouse + pan con arrastre (requiere Chart.js 4.x) -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    
+    <!-- Moment.js for time scales -->
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    
+    <!-- Theme init: runs in <head> before CSS renders — zero flash -->
+    <script>
+        (function () {
+        var t = localStorage.getItem('theme') || 'dark';
+        var cls = t === 'light' ? 'theme-light' : 'theme-dark';
+        // Apply to <html> immediately (prevents flash)
+        document.documentElement.classList.add(cls);
+        // Apply to <body> once it is available in the DOM
+        if (document.body) {
+        document.body.classList.add(cls);
+        } else {
+        document.addEventListener('DOMContentLoaded', function () {
+        document.body.classList.add(cls);
+        });
+        }
+        })();
+    </script>
+</head>
+
+<body>
+    <!-- ═══ CryptoView Splash Screen ═══ -->
+    <div id="cv-splash">
+        <div class="cv-splash-inner">
+            <svg class="cv-splash-eye" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path class="cv-splash-outline"
+                      d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z"
+                      fill="none" stroke="#FF7A00" stroke-width="3.5"
+                      stroke-linecap="round" pathLength="314" />
+                <circle cx="60" cy="40" r="20" fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.4" />
+                <circle class="cv-splash-pupil" cx="60" cy="40" r="14" fill="#FF7A00" />
+                <polyline points="44,44 52,36 58,42 66,32 76,38"
+                          fill="none" stroke="#fff" stroke-width="2"
+                          stroke-linecap="round" stroke-linejoin="round"
+                          class="cv-splash-chart" />
+            </svg>
+            <p class="cv-splash-name">CryptoView</p>
+            <p class="cv-splash-sub">Dashboard Educativo</p>
+        </div>
+    </div>
+
+    <style>
+        #cv-splash {
+            position: fixed; inset: 0; z-index: 99999;
+            display: flex; align-items: center; justify-content: center;
+            background: #0B1220;
+            transition: opacity 0.5s ease;
+        }
+        html.theme-light #cv-splash { background: #F4F1EC; }
+        #cv-splash.cv-splash-hidden { opacity: 0; pointer-events: none; }
+
+        .cv-splash-inner {
+            display: flex; flex-direction: column; align-items: center; gap: 1rem;
+            animation: cv-fade-in 0.5s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        .cv-splash-eye { width: 100px; height: 68px; filter: drop-shadow(0 0 18px rgba(255,122,0,0.55)); }
+        .cv-splash-outline {
+            stroke-dasharray: 314; stroke-dashoffset: 314;
+            animation: cv-dash 1.4s ease-in-out infinite;
+        }
+        .cv-splash-pupil {
+            transform-origin: 60px 40px;
+            animation: cv-splash-p 1.4s ease-in-out infinite;
+        }
+        @@keyframes cv-splash-p {
+            0%,100% { transform: scale(1); opacity:.9; }
+            50%     { transform: scale(1.28); opacity:1; }
+        }
+        .cv-splash-chart {
+            stroke-dasharray: 60; stroke-dashoffset: 60;
+            animation: cv-chart-draw 1.4s ease-in-out infinite;
+        }
+        .cv-splash-name {
+            font-family: 'Poppins', 'Inter', sans-serif; font-weight: 800;
+            font-size: 1.8rem; letter-spacing: -0.02em; margin: 0;
+            color: #FF7A00;
+        }
+        .cv-splash-sub {
+            font-family: 'Inter', sans-serif; font-size: 0.85rem;
+            color: rgba(156,163,175,0.85); margin: 0; letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        html.theme-light .cv-splash-sub { color: rgba(107,100,92,0.85); }
+    </style>
+
+    <app>
+        <component type="typeof(CryptoView.App)" render-mode="ServerPrerendered" />
+    </app>
+
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            Ha ocurrido un error. Recarga la página.
+        </environment>
+        <environment include="Development">
+            Se produjo una excepción no controlada. Consulta los registros del navegador para obtener detalles.
+        </environment>
+        <a href="" class="reload">Recargar</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Theme management -->
+    <script src="js/theme.js"></script>
+        <script src="~/js/cvCurrencySelect.js"></script>
+        <script src="~/js/loginAccessibility.js"></script>
+    
+    <!-- Custom Chart.js Functions -->
+    <script>
+        window._cvCharts = {};
+
+        // ── Brand palette for charts ──────────────────────────────────────
+        var CV = {
+            accent:      '#FF7A00',
+            accentGlow:  'rgba(255,122,0,0.22)',
+            accentFill:  'rgba(255,122,0,0.15)',
+            yellow:      '#F59E0B',
+            blue:        '#3B82F6',
+            blueSoft:    'rgba(59,130,246,0.15)',
+            gridDark:    'rgba(255,122,0,0.08)',
+            gridLight:   'rgba(0,0,0,0.06)',
+            tickDark:    '#9CA3AF',
+            tickLight:   '#6B645C',
+            // per-index series colors (pie/bar)
+            series: [
+                'rgba(255,122,0,0.70)',  // orange
+                'rgba(59,130,246,0.70)', // blue
+                'rgba(34,197,94,0.70)',  // green
+                'rgba(245,158,11,0.70)', // amber
+                'rgba(239,68,68,0.70)',  // red
+                'rgba(139,92,246,0.70)', // violet
+                'rgba(6,182,212,0.70)',  // cyan
+                'rgba(236,72,153,0.70)', // pink
+            ],
+            isLight: function () {
+                return document.documentElement.classList.contains('theme-light');
+            },
+            gridColor: function () {
+                return this.isLight() ? this.gridLight : this.gridDark;
+            },
+            tickColor: function () {
+                return this.isLight() ? this.tickLight : this.tickDark;
+            },
+        };
+
+        // ── Formateador de precio USD con decimales adaptados a la magnitud ──
+        // monedas grandes (BTC): $65,234.12  |  medianas (XRP): $0.5600
+        // chicas (TRX):          $0.082400   |  micro:          $0.000001
+        function cvFormatPrice(v) {
+            if (v === null || v === undefined || isNaN(v)) return '$0.00';
+            var abs = Math.abs(v);
+            if (abs === 0)       return '$0.00';
+            if (abs >= 1000)     return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (abs >= 1)        return '$' + Number(v).toFixed(2);
+            if (abs >= 0.01)     return '$' + Number(v).toFixed(4);
+            if (abs >= 0.0001)   return '$' + Number(v).toFixed(6);
+            return '$' + Number(v).toFixed(8);
+        }
+
+        // ── Gráfico histórico estilo CoinGecko (una sola moneda) ─────────
+        // • Línea naranja continua, sin puntos visibles (pointRadius: 0)
+        // • Relleno degradado naranja suave debajo de la línea
+        // • Tooltip con fecha + precio formateado con precisión adaptada
+        window.renderLineChart = function (canvasId, labels, data, datasetLabel, chartTitle) {
+            var ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            if (window._cvCharts[canvasId]) {
+                window._cvCharts[canvasId].destroy();
+                delete window._cvCharts[canvasId];
+            }
+            // Resetear scroll wrapper al modo de moneda única
+            var scrollInner = document.getElementById('chartScrollInner');
+            if (scrollInner) { scrollInner.style.minWidth = ''; scrollInner.style.width = ''; }
+
+            // Plugin: crea el degradado naranja después del primer layout
+            var gradientPlugin = {
+                id: 'cvOrangeGradient',
+                beforeDraw: function (chart) {
+                    if (!chart.chartArea) return;
+                    var c2  = chart.ctx;
+                    var a   = chart.chartArea;
+                    var grad = c2.createLinearGradient(0, a.top, 0, a.bottom);
+                    grad.addColorStop(0,   'rgba(255,122,0,0.28)');
+                    grad.addColorStop(0.55,'rgba(255,122,0,0.07)');
+                    grad.addColorStop(1,   'rgba(255,122,0,0.00)');
+                    chart.data.datasets[0].backgroundColor = grad;
+                }
+            };
+
+            window._cvCharts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label:                  datasetLabel || 'Precio (USD)',
+                        data:                   data,
+                        borderColor:            '#FF7A00',
+                        backgroundColor:        'rgba(255,122,0,0.15)', // reemplazado por degradado
+                        borderWidth:            2.5,
+                        pointRadius:            0,          // sin puntos visibles
+                        pointHoverRadius:       4,
+                        pointHoverBackgroundColor: '#FF7A00',
+                        pointHoverBorderColor:  '#fff',
+                        tension:                0.35,
+                        fill:                   true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    resizeDelay: 200,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },   // ocultar leyenda (hay una sola moneda)
+                        title: {
+                            display: true,
+                            text:    chartTitle || 'Evolución histórica de precios',
+                            color:   CV.accent,
+                            font:    { size: 15, family: "'Poppins','Inter',sans-serif", weight: '600' },
+                            padding: { bottom: 14 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(18,26,43,0.95)',
+                            borderColor:     CV.accentGlow,
+                            borderWidth:     1,
+                            titleColor:      CV.yellow,
+                            bodyColor:       '#E5E7EB',
+                            cornerRadius:    8,
+                            padding:         10,
+                            callbacks: {
+                                title: function (items) { return items[0].label; },
+                                label: function (c) {
+                                    return '  ' + (c.dataset.label || 'Precio') + ':  ' + cvFormatPrice(c.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Fecha', color: CV.yellow,
+                                     font: { family: "'Inter',sans-serif", size: 12, weight: '600' } },
+                            ticks: { color: CV.tickColor(), font: { weight: '500' },
+                                     maxRotation: 30, maxTicksLimit: 10 },
+                            grid:  { color: CV.gridColor() }
+                        },
+                        y: {
+                            title: { display: true, text: 'Precio en USD', color: CV.yellow,
+                                     font: { family: "'Inter',sans-serif", size: 12, weight: '600' } },
+                            ticks: {
+                                color: CV.tickColor(),
+                                font:  { weight: '500' },
+                                // Formato inteligente según magnitud del precio
+                                callback: function (v) { return cvFormatPrice(v); }
+                            },
+                            grid: { color: CV.gridColor() }
+                        }
+                    }
+                },
+                plugins: [gradientPlugin]
+            });
+        };
+
+                window.renderPieChart = function (canvasId, labels, data, titleText) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (window._cvCharts[canvasId]) {
+        window._cvCharts[canvasId].destroy();
+        delete window._cvCharts[canvasId];
+        }
+        window._cvCharts[canvasId] = new Chart(ctx, {
+        type: 'pie',
+        data: {
+        labels: labels,
+        datasets: [{
+        data: data,
+        backgroundColor: CV.series,
+        borderColor: CV.series.map(c => c.replace('0.70', '1')),
+        borderWidth: 2,
+        hoverOffset: 8
+        }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        plugins: {
+        legend: {
+        position: 'bottom',
+        labels: { color: CV.tickColor(), font: { family: "'Inter',sans-serif", size: 12 }, padding: 16 }
+        },
+        title: {
+        display: true,
+        text: titleText || 'Distribución de Market Cap',
+        color: CV.accent,
+        font: { size: 15, family: "'Poppins','Inter',sans-serif", weight: '600' }
+        },
+        tooltip: {
+        backgroundColor: 'rgba(18,26,43,0.95)',
+        borderColor: CV.accentGlow,
+        borderWidth: 1,
+        titleColor: CV.yellow,
+        bodyColor: '#E5E7EB',
+        cornerRadius: 8,
+        }
+        }
+        }
+        });
+        };
+
+        window.renderBarChart = function (canvasId, labels, data) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        if (window._cvCharts[canvasId]) {
+        window._cvCharts[canvasId].destroy();
+        delete window._cvCharts[canvasId];
+        }
+        const posColor  = 'rgba(34,197,94,0.65)';
+        const negColor  = 'rgba(239,68,68,0.65)';
+        const posBorder = '#22C55E';
+        const negBorder = '#EF4444';
+        const colors       = data.map(d => d >= 0 ? posColor  : negColor);
+        const borderColors = data.map(d => d >= 0 ? posBorder : negBorder);
+        window._cvCharts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+        labels: labels,
+        datasets: [{
+        label: 'Cambio 24h (%)',
+        data: data,
+        backgroundColor: colors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6,
+        borderSkipped: false
+        }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        resizeDelay: 200,
+        plugins: {
+        legend: { display: false },
+        title: {
+        display: true,
+        text: 'Variación de Precio 24h (%)',
+        color: CV.accent,
+        font: { size: 15, family: "'Poppins','Inter',sans-serif", weight: '600' }
+        },
+        tooltip: {
+        backgroundColor: 'rgba(18,26,43,0.95)',
+        borderColor: CV.accentGlow,
+        borderWidth: 1,
+        titleColor: CV.yellow,
+        bodyColor: '#E5E7EB',
+        cornerRadius: 8,
+        }
+        },
+        scales: {
+        x: {
+        ticks: { color: CV.tickColor(), font: { weight: '500' } },
+        grid: { color: CV.gridColor() }
+        },
+        y: {
+        ticks: { color: CV.tickColor(), font: { weight: '500' } },
+        grid: { color: CV.gridColor() },
+        beginAtZero: true
+        }
+        }
+        }
+        });
+        };
+        window.renderLineChartMulti = function (canvasId, labels, datasets, chartTitle, mode) {
+            var ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            if (window._cvCharts[canvasId]) {
+                window._cvCharts[canvasId].destroy();
+                delete window._cvCharts[canvasId];
+            }
+            var isPercent = (mode === 'percent');
+
+            // ── Paleta de colores por s\u00edmbolo de moneda ──
+            var COIN_COLORS = {
+                'BTC':  { line: '#FF8F00', fill: 'rgba(255,143,0,0.07)' },
+                'ETH':  { line: '#00E676', fill: 'rgba(0,230,118,0.07)' },
+                'BNB':  { line: '#FFD54F', fill: 'rgba(255,213,79,0.07)' },
+                'ADA':  { line: '#42A5F5', fill: 'rgba(66,165,245,0.07)' },
+                'SOL':  { line: '#AB47BC', fill: 'rgba(171,71,188,0.07)' },
+                'XRP':  { line: '#EC407A', fill: 'rgba(236,64,122,0.07)' },
+                'DOGE': { line: '#FFD54F', fill: 'rgba(255,213,79,0.07)' },
+                'DOT':  { line: '#E040FB', fill: 'rgba(224,64,251,0.07)' },
+                'LINK': { line: '#29B6F6', fill: 'rgba(41,182,246,0.07)' },
+                'AVAX': { line: '#EF5350', fill: 'rgba(239,83,80,0.07)' },
+                'ETC':  { line: '#3DDC84', fill: 'rgba(61,220,132,0.07)' },
+                'LTC':  { line: '#A0A0A0', fill: 'rgba(160,160,160,0.07)' },
+                'XLM':  { line: '#00BCD4', fill: 'rgba(0,188,212,0.07)' }
+            };
+            var DEFAULT_PALETTE = [
+                { line: '#FF8F00', fill: 'rgba(255,143,0,0.07)' },
+                { line: '#00E676', fill: 'rgba(0,230,118,0.07)' },
+                { line: '#FFD54F', fill: 'rgba(255,213,79,0.07)' },
+                { line: '#42A5F5', fill: 'rgba(66,165,245,0.07)' },
+                { line: '#AB47BC', fill: 'rgba(171,71,188,0.07)' },
+                { line: '#EC407A', fill: 'rgba(236,64,122,0.07)' }
+            ];
+            var defaultColorIdx = 0;
+            // ── Debug ──
+            console.log('[CryptoView] renderLineChartMulti', {
+                mode: mode,
+                labels: (labels || []).length,
+                datasets: (datasets || []).length,
+                coins: (datasets || []).map(function (d) { return d.label; }),
+                pointsPerDataset: (datasets || []).map(function (d) {
+                    return { coin: d.label, points: (d.data || []).length };
+                })
+            });
+
+            // \u2500\u2500 Patrones de guiones para per\u00eddos (compatibilidad) \u2500\u2500
+            var dashPatterns = { 'Principal': [], 'Per\u00edodo 1': [8, 4], 'Per\u00edodo 2': [3, 3] };
+
+
+            var chartDatasets = (datasets || []).map(function (ds, i) {
+                var hasPeriod = ds.label.indexOf(' \u2014 ') !== -1;
+                var parts  = hasPeriod ? ds.label.split(' \u2014 ') : [ds.label, null];
+                var sym    = parts[0].trim().toUpperCase();
+                var period = parts[1] ? parts[1].trim() : null;
+                var palette = COIN_COLORS[sym] || DEFAULT_PALETTE[defaultColorIdx++ % DEFAULT_PALETTE.length];
+                var dash   = period !== null && (period in dashPatterns) ? dashPatterns[period] : [];
+                return {
+                    label:                     ds.label,
+                    data:                      ds.data,
+                    originalData:              ds.originalData || null,
+                    borderColor:               palette.line,
+                    backgroundColor:           palette.fill,
+                    borderWidth:               2.5,
+                    borderDash:                dash,
+                    pointRadius:               (labels || []).length <= 15 ? 2 : 0,
+                    pointHoverRadius:          5,
+                    pointHoverBackgroundColor: palette.line,
+                    pointHoverBorderColor:     '#fff',
+                    pointHoverBorderWidth:     2,
+                    tension:                   0.3,
+                    fill:                      false,
+                    spanGaps:                  true
+                };
+            });
+
+            // Resetear scroll wrapper
+            var scrollInner = document.getElementById('chartScrollInner');
+            if (scrollInner) { scrollInner.style.minWidth = ''; scrollInner.style.width = ''; }
+
+            var pointCount = (labels || []).length;
+
+            // Densidad de ticks en X
+            var maxTicks = pointCount <= 30 ? 10
+                         : pointCount <= 90  ? 14
+                         : Math.min(20, Math.ceil(pointCount / 18));
+
+
+            // Auto-escala del eje Y seg\u00fan el rango X visible
+            function rescaleY(chart) {
+                try {
+                    var xScale = chart.scales['x'];
+                    if (!xScale) return;
+                    var lo = Math.max(0, Math.floor(xScale.min));
+                    var hi = Math.min(pointCount - 1, Math.ceil(xScale.max));
+                    var yMin = Infinity, yMax = -Infinity;
+                    chart.data.datasets.forEach(function (ds, di) {
+                        if (chart.getDatasetMeta(di).hidden) return;
+                        for (var j = lo; j <= hi; j++) {
+                            var v = ds.data[j];
+                            if (v !== null && v !== undefined && isFinite(v)) {
+                                if (v < yMin) yMin = v;
+                                if (v > yMax) yMax = v;
+                            }
+                        }
+                    });
+                    if (isFinite(yMin) && isFinite(yMax) && yMax > yMin) {
+                        var pad = (yMax - yMin) * 0.12;
+                        chart.options.scales.y.min = yMin - pad;
+                        chart.options.scales.y.max = yMax + pad;
+                        chart.update('none');
+                    }
+                } catch (e) { /* ignorar */ }
+            }
+
+            // Debug: tabla completa de datasets antes de renderizar
+            var _dbg = chartDatasets.map(function(ds) {
+                var valid = (ds.data || []).filter(function(v) { return v !== null && v !== undefined && isFinite(v); });
+                var mn = valid.length ? Math.min.apply(null, valid) : null;
+                var mx = valid.length ? Math.max.apply(null, valid) : null;
+                return {
+                    moneda:      ds.label,
+                    puntos:      valid.length,
+                    primerValor: valid.length ? +valid[0].toFixed(4)              : null,
+                    ultimoValor: valid.length ? +valid[valid.length-1].toFixed(4) : null,
+                    min:         mn !== null   ? +mn.toFixed(4)                   : null,
+                    max:         mx !== null   ? +mx.toFixed(4)                   : null
+                };
+            });
+            console.table(_dbg);
+            // Filtrar datasets sin datos validos; advertir si planos
+            chartDatasets = chartDatasets.filter(function(ds) {
+                var valid = (ds.data || []).filter(function(v) { return v !== null && v !== undefined && isFinite(v); });
+                if (valid.length === 0) {
+                    console.warn('[CryptoView] Dataset sin datos: ' + ds.label);
+                    return false;
+                }
+                var mn = Math.min.apply(null, valid);
+                var mx = Math.max.apply(null, valid);
+                if (mn === mx) {
+                    console.warn('[CryptoView] Dataset plano: revisar origen de datos - ' + ds.label + ' (valor=' + mn + ')');
+                }
+                return true;
+            });
+
+            // Compute explicit Y-axis bounds so the chart scales correctly on first render,
+            // including the edge case where all values are 0 (e.g. only 1 data point).
+            var _yVals = [];
+            chartDatasets.forEach(function (ds) {
+                (ds.data || []).forEach(function (v) {
+                    if (v !== null && v !== undefined && isFinite(v)) _yVals.push(v);
+                });
+            });
+            var _yMin = _yVals.length ? Math.min.apply(null, _yVals) : (isPercent ? -1 : 0);
+            var _yMax = _yVals.length ? Math.max.apply(null, _yVals) : (isPercent ? 1 : 100);
+            if (_yMax <= _yMin) { _yMin -= 1; _yMax += 1; } // degenerate range guard
+            var _yPad = (_yMax - _yMin) * 0.12;
+
+            window._cvCharts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: chartDatasets },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    resizeDelay:         200,
+                    clip:                false,
+                    interaction:         { mode: 'index', intersect: false },
+                    animation:           { duration: 500, easing: 'easeInOutQuart' },
+                    layout: {
+                        padding: { top: 24, right: 32, bottom: 32, left: 32 }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align:    'center',
+                            labels: {
+                                color:         CV.yellow,
+                                font:          { family: "'Poppins','Inter',sans-serif", size: 12, weight: '600' },
+                                padding:       22,
+                                usePointStyle: true,
+                                pointStyle:    'line',
+                                boxWidth:      30
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text:    chartTitle || (isPercent ? 'Rendimiento porcentual acumulado' : 'Comparaci\u00f3n de precios hist\u00f3ricos'),
+                            color:   CV.accent,
+                            font:    { size: 15, family: "'Poppins','Inter',sans-serif", weight: '700' },
+                            padding: { bottom: 16 }
+                        },
+                        tooltip: {
+                            mode:            'index',
+                            intersect:       false,
+                            backgroundColor: 'rgba(10,16,30,0.97)',
+                            borderColor:     CV.accentGlow,
+                            borderWidth:     1,
+                            titleColor:      CV.yellow,
+                            bodyColor:       '#E5E7EB',
+                            cornerRadius:    10,
+                            padding:         14,
+                            titleFont:       { family: "'Poppins',sans-serif", size: 12, weight: '700' },
+                            bodyFont:        { family: "'Inter',sans-serif", size: 12 },
+                            callbacks: {
+                                title: function (items) { return items[0].label; },
+                                label: function (c) {
+                                    var pref = '\u25cf  ';
+                                    if (isPercent) {
+                                        var pct  = (c.parsed.y >= 0 ? '+' : '') + c.parsed.y.toFixed(2) + '%';
+                                        var orig = c.dataset.originalData && c.dataset.originalData[c.dataIndex];
+                                        var line = pref + c.dataset.label + ':   ' + pct;
+                                        if (orig !== undefined && orig !== null) line += '  (' + cvFormatPrice(orig) + ')';
+                                        return line;
+                                    }
+                                    return pref + c.dataset.label + ':   ' + cvFormatPrice(c.parsed.y);
+                                }
+                            }
+                        },
+                        zoom: {
+                            pan: {
+                                enabled:       true,
+                                mode:          'x',
+                                onPanComplete: function (ctx2) { rescaleY(ctx2.chart); }
+                            },
+                            zoom: {
+                                wheel:          { enabled: true, speed: 0.08 },
+                                pinch:          { enabled: true },
+                                mode:           'x',
+                                onZoomComplete: function (ctx2) { rescaleY(ctx2.chart); }
+                            },
+                            limits: {
+                                x: { min: 'original', max: 'original', minRange: 8 }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            offset: true,
+                            bounds: 'ticks',
+                            ticks: {
+                                color:         CV.tickColor(),
+                                font:          { family: "'Inter',sans-serif", size: 11, weight: '500' },
+                                maxRotation:   0,
+                                autoSkip:      true,
+                                maxTicksLimit: 8,
+                                padding:       4
+                            },
+                            grid: { color: CV.gridColor(), lineWidth: 0.6 }
+                        },
+                        y: {
+                            type:  'linear',
+                            min:   _yMin - _yPad,
+                            max:   _yMax + _yPad,
+                            title: {
+                                display: true,
+                                text:    isPercent ? 'Rendimiento (%)' : 'Precio en USD',
+                                color:   CV.accent,
+                                font:    { family: "'Inter',sans-serif", size: 11, weight: '600' }
+                            },
+                            ticks: {
+                                color:    CV.tickColor(),
+                                font:     { family: "'Inter',sans-serif", size: 11, weight: '500' },
+                                padding:  10,
+                                callback: function (v) {
+                                    if (isPercent) return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+                                    return v >= 1000 ? '\$' + (v / 1000).toFixed(1) + 'k' : '\$' + Number(v).toFixed(2);
+                                }
+                            },
+                            grid: { color: CV.gridColor(), lineWidth: 0.6 }
+                        }
+                    }
+                }
+            });
+            window.cryptoChartInstance = window._cvCharts[canvasId];
+        };
+                window.destroyChart = function (canvasId) {
+        if (window._cvCharts && window._cvCharts[canvasId]) {
+        window._cvCharts[canvasId].destroy();
+        delete window._cvCharts[canvasId];
+        }
+        };
+    </script>
+    
+    <script src="_framework/blazor.server.js"></script>
+
+    <script>
+        // Hide splash once Blazor is connected and first render completes
+        (function () {
+            function hideSplash() {
+                var s = document.getElementById('cv-splash');
+                if (s) {
+                    s.classList.add('cv-splash-hidden');
+                    setTimeout(function () { s.remove(); }, 550);
+                }
+            }
+            // Blazor Server fires 'enhancedload' after reconnect; use a fallback timer too
+            if (window.Blazor) {
+                Blazor.addEventListener('enhancedload', hideSplash);
+            }
+            // Fallback: hide after 2.5 s max regardless
+            setTimeout(hideSplash, 2500);
+        })();
+    </script>
+
+    <script>
+        // Elimina el foco programático que Blazor Server aplica al cargar la página,
+        // evitando que aparezca el focus ring del navegador sobre el contenido.
+        Blazor.addEventListener('enhancedload', function () {
+        if (document.activeElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+        }
+        });
+        window.addEventListener('load', function () {
+        setTimeout(function () {
+        if (document.activeElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+        }
+        }, 50);
+        });
+    </script>
+
+
+    <script>
+        // === Profile photo helpers (per user) ===
+        window.triggerFileInput = function (id) {
+            document.getElementById(id)?.click();
+        };
+        window.profilePhoto = {
+            save: function (username, data) {
+                if (!username) return;
+                try { localStorage.setItem('cv_profile_photo_' + username, data); } catch (e) { }
+            },
+            load: function (username) {
+                if (!username) return null;
+                return localStorage.getItem('cv_profile_photo_' + username);
+            },
+            remove: function (username) {
+                if (!username) return;
+                localStorage.removeItem('cv_profile_photo_' + username);
+            }
+        };
+        window.profileData = {
+            save: function (username, json) {
+                if (!username) return;
+                try { localStorage.setItem('cv_profile_data_' + username, json); } catch (e) { }
+            },
+            load: function (username) {
+                if (!username) return null;
+                return localStorage.getItem('cv_profile_data_' + username);
+            }
+        };
+    </script>
+
+    <script>
+        // ── Print helper: close all open menus then print ──────────────────
+        // ── Date input mask helper ────────────────────────────────────────
+        window.cvDateMask = {
+            // Formats raw text into dd/MM/yyyy — auto-inserts slashes, strips non-digits
+            format: function (raw) {
+                var digits = (raw || '').replace(/\D/g, '').substring(0, 8);
+                var out = '';
+                for (var i = 0; i < digits.length; i++) {
+                    if (i === 2 || i === 4) out += '/';
+                    out += digits[i];
+                }
+                return out;
+            },
+            // Returns true when str is a real calendar date in dd/MM/yyyy format
+            validate: function (str) {
+                if (!str || str.length !== 10) return false;
+                var p = str.split('/');
+                if (p.length !== 3 || p[0].length !== 2 || p[1].length !== 2 || p[2].length !== 4) return false;
+                var d = parseInt(p[0], 10), m = parseInt(p[1], 10), y = parseInt(p[2], 10);
+                if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
+                if (d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > 2100) return false;
+                var dt = new Date(y, m - 1, d);
+                return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+            },
+            // dd/MM/yyyy  →  yyyy-mm-dd
+            toISO: function (str) { var p = str.split('/'); return p[2] + '-' + p[1] + '-' + p[0]; },
+            // yyyy-mm-dd  →  dd/MM/yyyy
+            toDisplay: function (iso) {
+                if (!iso) return '';
+                var p = iso.split('-');
+                return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : '';
+            }
+        };
+
+        // ── CryptoView date picker (Flatpickr wrapper) ────────────────────
+        window.cvDatePicker = {
+            instances: {},
+            // For main filter inputs — callback: method(dateStr)
+            init: function (elementId, dotNetRef, method, initialValue) {
+                this._create(elementId, initialValue, function (dateStr) {
+                    dotNetRef.invokeMethodAsync(method, dateStr);
+                });
+            },
+            // For comparison row inputs — callback: SetRowDate(rowId, field, dateStr)
+            initRow: function (elementId, dotNetRef, rowId, field, initialValue) {
+                this._create(elementId, initialValue, function (dateStr) {
+                    dotNetRef.invokeMethodAsync('SetRowDate', rowId, field, dateStr);
+                });
+            },
+            _create: function (elementId, initialValue, onChange) {
+                if (this.instances[elementId]) {
+                    this.instances[elementId].destroy();
+                    delete this.instances[elementId];
+                }
+                var el = document.getElementById(elementId);
+                if (!el) return;
+
+                // Error span (id = elementId + '-error', placed in markup)
+                var errEl = document.getElementById(elementId + '-error');
+                var fpRef = { fp: null };
+
+                function setError(msg) {
+                    if (errEl) { errEl.textContent = msg || ''; errEl.style.display = msg ? 'block' : 'none'; }
+                    var ae = fpRef.fp && fpRef.fp.altInput;
+                    if (ae) ae.classList.toggle('cv-date-invalid', !!msg);
+                }
+
+                var opts = {
+                    dateFormat:    'Y-m-d',
+                    altInput:      true,
+                    altInputClass: 'flatpickr-input filter-input cv-date-input',
+                    altFormat:     'd/m/Y',
+                    allowInput:    true,
+                    disableMobile: true,
+                    locale: typeof flatpickr !== 'undefined' && flatpickr.l10ns && flatpickr.l10ns.es ? 'es' : 'default',
+                    onChange: function (sel, dateStr) {
+                        setError('');
+                        onChange(dateStr || '');
+                    },
+                    onReady: function (sel, dateStr, fpInst) {
+                        fpRef.fp = fpInst;
+                        fpInst.calendarContainer && fpInst.calendarContainer.classList.add('cv-flatpickr-cal');
+                        var wrap = el.closest('.cv-datepicker-wrap');
+                        var icon = wrap ? wrap.querySelector('.cv-datepicker-icon') : null;
+                        if (icon && !icon.dataset.cvBound) {
+                            icon.addEventListener('click', function (ev) {
+                                ev.preventDefault();
+                                if (fpInst && typeof fpInst.open === 'function') fpInst.open();
+                                if (fpInst && fpInst.altInput) fpInst.altInput.focus();
+                            });
+                            icon.dataset.cvBound = '1';
+                        }
+                        var altEl = fpInst.altInput;
+                        if (!altEl) return;
+
+                        // Attributes for smart masked input
+                        altEl.setAttribute('placeholder', 'dd/MM/yyyy');
+                        altEl.setAttribute('maxlength', '10');
+                        altEl.setAttribute('autocomplete', 'off');
+                        altEl.setAttribute('spellcheck', 'false');
+                        altEl.setAttribute('inputmode', 'numeric');
+
+                        // Block letters, symbols and >8-digit attempts
+                        altEl.addEventListener('keydown', function (e) {
+                            var ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End','Enter'];
+                            if (ok.indexOf(e.key) !== -1) return;
+                            if (e.ctrlKey || e.metaKey) return;
+                            if (!/^\d$/.test(e.key)) { e.preventDefault(); return; }
+                            if (altEl.value.replace(/\D/g, '').length >= 8) e.preventDefault();
+                        });
+
+                        // Smart mask: auto-slashes, calendar sync on complete valid date
+                        altEl.addEventListener('input', function () {
+                            var prev = altEl.value;
+                            var pos  = altEl.selectionStart;
+                            var fmt  = window.cvDateMask.format(prev);
+                            if (fmt !== prev) {
+                                altEl.value = fmt;
+                                var np = Math.max(0, Math.min(fmt.length, pos + (fmt.length - prev.length)));
+                                try { altEl.setSelectionRange(np, np); } catch (ex) {}
+                            }
+                            setError('');
+                            if (fmt.length === 10) {
+                                if (window.cvDateMask.validate(fmt)) {
+                                    fpInst.setDate(window.cvDateMask.toISO(fmt), true);
+                                    // Restore dd/MM/yyyy display after Flatpickr rewrites altInput
+                                    setTimeout(function () { if (altEl) altEl.value = fmt; }, 0);
+                                } else {
+                                    setError('Fecha inv\u00e1lida');
+                                    fpInst.clear();
+                                    onChange('');
+                                }
+                            } else if (fmt.length === 0) {
+                                fpInst.clear();
+                                onChange('');
+                            }
+                        });
+
+                        // Sanitise paste: only digits, then reformat
+                        altEl.addEventListener('paste', function (e) {
+                            e.preventDefault();
+                            var txt = (e.clipboardData || window.clipboardData).getData('text');
+                            altEl.value = window.cvDateMask.format(txt);
+                            altEl.dispatchEvent(new Event('input'));
+                        });
+                    }
+                };
+
+                if (initialValue) opts.defaultDate = initialValue;
+                fpRef.fp = flatpickr(el, opts);
+                this.instances[elementId] = fpRef.fp;
+
+                // Apply formatted display for the initial value
+                if (initialValue && fpRef.fp.altInput) {
+                    fpRef.fp.altInput.value = window.cvDateMask.toDisplay(initialValue);
+                }
+            },
+            destroy: function (elementId) {
+                if (this.instances[elementId]) {
+                    this.instances[elementId].destroy();
+                    delete this.instances[elementId];
+                }
+            },
+            clear: function (elementId) {
+                if (this.instances[elementId]) {
+                    this.instances[elementId].clear();
+                    var altEl = this.instances[elementId].altInput;
+                    if (altEl) { altEl.value = ''; altEl.classList.remove('cv-date-invalid'); }
+                    var errEl = document.getElementById(elementId + '-error');
+                    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+                }
+            }
+        };
+
+        window.cvDownloadChart = function (canvasId, filename) {
+            var canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            var link = document.createElement('a');
+            link.download = filename || 'grafico.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+
+        window.cvResetZoom = function (canvasId) {
+            var chart = window._cvCharts && window._cvCharts[canvasId];
+            if (chart && typeof chart.resetZoom === 'function') chart.resetZoom();
+        };
+
+        window.cvPrint = function (hasData) {
+            // Guard: no imprimir si no hay datos cargados
+            if (hasData === false) {
+                alert('Primero generá un gráfico antes de imprimir.');
+                return;
+            }
+
+            // 1. Colapsar clases de estado abiertas (dropdown, menú, etc.)
+            document.querySelectorAll('.show, .open, .active-menu, .is-open').forEach(function (el) {
+                el.classList.remove('show', 'open', 'active-menu', 'is-open');
+            });
+            document.querySelectorAll('[aria-expanded="true"]').forEach(function (el) {
+                el.setAttribute('aria-expanded', 'false');
+            });
+
+            // 2. Ocultar paneles flotantes controlados por Blazor
+            document.querySelectorAll(
+                '.export-dropdown, .notif-panel, .profile-dropdown, .dropdown-menu, .modal-backdrop, .modal.show'
+            ).forEach(function (el) {
+                el.style.setProperty('display', 'none', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+            });
+
+            // 3. Ocultar overlay del sidebar
+            document.querySelectorAll('.sidebar-overlay').forEach(function (el) {
+                el.style.setProperty('display', 'none', 'important');
+            });
+
+            // 4. Quitar foco para que no aparezcan anillos de foco en papel
+            if (document.activeElement) document.activeElement.blur();
+
+            // 5. Redimensionar instancias de Chart.js para que llenen el canvas en impresión
+            document.querySelectorAll('canvas').forEach(function (canvas) {
+                try {
+                    var chartInstance = window.Chart && window.Chart.getChart
+                        ? window.Chart.getChart(canvas)
+                        : null;
+                    if (chartInstance) {
+                        chartInstance.resize();
+                        chartInstance.update('none'); // 'none' = sin animación
+                    }
+                } catch (e) { /* ignorar errores de canvas no-Chart */ }
+            });
+
+            // 6. Esperar a que el resize se estabilice antes de imprimir
+            setTimeout(function () { window.print(); }, 220);
+        };
+    </script>
+</body>
+
+</html>

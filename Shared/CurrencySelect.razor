@@ -1,0 +1,107 @@
+@using Microsoft.AspNetCore.Components.Web
+@inject IJSRuntime JS
+
+<div class="custom-currency-select @(DropdownOpen ? "open" : null) @(CssClass)" tabindex="0" @onkeydown="HandleKeyDown"
+     @onblur="OnBlur">
+    <button type="button" class="currency-select-btn" @onclick="ToggleDropdown" @ref="ButtonRef" aria-haspopup="listbox"
+            aria-expanded="@DropdownOpen.ToString().ToLower()" aria-controls="@ListboxId" aria-label="Moneda preferida">
+        <span class="currency-select-value">@GetCurrencyLabel(SelectedCurrency)</span>
+        <span class="currency-select-arrow">&#9662;</span>
+    </button>
+    <div id="@ListboxId" class="dropdown-menu" role="listbox"
+         style="display:@(DropdownOpen ? "block" : "none");width:@DropdownWidthPx" @ref="DropdownRef">
+        @foreach (var option in Options)
+        {
+            <div class="dropdown-item @(option.Value == SelectedCurrency ? "selected" : null)" role="option"
+                 aria-selected="@(option.Value == SelectedCurrency ? "true" : "false")"
+                 @onclick="() => SelectCurrency(option.Value)" tabindex="0"
+                 @onkeydown="(e) => HandleOptionKeyDown(e, option.Value)">
+                <span class="currency-flag">@option.Flag</span>
+                <span class="currency-code">@option.Value</span>
+                <span class="currency-label">- @option.Label</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string SelectedCurrency { get; set; } = "USD";
+    [Parameter] public EventCallback<string> SelectedCurrencyChanged { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+
+    private bool DropdownOpen = false;
+    private string? DropdownWidthPx;
+    private readonly string ListboxId = $"currency-listbox-{Guid.NewGuid():N}";
+    private ElementReference ButtonRef;
+    private ElementReference DropdownRef;
+
+    private readonly List<(string Value, string Label, string Flag)> Options = new()
+    {
+        ("USD", "Dólar", "🇺🇸"),
+        ("ARS", "Peso Arg.", "🇦🇷"),
+        ("EUR", "Euro", "🇪🇺"),
+        ("BRL", "Real", "🇧🇷"),
+        ("BTC", "Bitcoin", "₿")
+    };
+
+    private void ToggleDropdown()
+    {
+        DropdownOpen = !DropdownOpen;
+        if (DropdownOpen)
+        {
+            StateHasChanged();
+            _ = Task.Delay(1).ContinueWith(_ => SetDropdownWidth());
+        }
+    }
+
+    private void SetDropdownWidth()
+    {
+        var task = JS.InvokeAsync<double>("cvCurrencySelect.getWidth", ButtonRef);
+        task.AsTask().ContinueWith(t =>
+        {
+            if (t.Status == TaskStatus.RanToCompletion)
+            {
+                DropdownWidthPx = t.Result + "px";
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private void SelectCurrency(string value)
+    {
+        SelectedCurrency = value;
+        DropdownOpen = false;
+        SelectedCurrencyChanged.InvokeAsync(value);
+    }
+
+    private void OnBlur(FocusEventArgs e)
+    {
+        DropdownOpen = false;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowDown" && !DropdownOpen)
+        {
+            ToggleDropdown();
+        }
+        else if (e.Key == "Escape")
+        {
+            DropdownOpen = false;
+        }
+    }
+
+    private void HandleOptionKeyDown(KeyboardEventArgs e, string value)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+        {
+            SelectCurrency(value);
+        }
+    }
+
+    private string GetCurrencyLabel(string value)
+    {
+        var opt = Options.FirstOrDefault(o => o.Value == value);
+        return opt != default ? $"{opt.Flag} {opt.Value} - {opt.Label}" : value;
+    }
+}
