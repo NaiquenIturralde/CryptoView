@@ -733,3 +733,4 @@ C:\Users\naiqu\Documents\Mis programas\CryptoView\CryptoView\bin\Debug\net8.0\BC
 C:\Users\naiqu\Documents\Mis programas\CryptoView\CryptoView\obj\Debug\net8.0\swae.build.ex.cache
 C:\Users\naiqu\Documents\Mis programas\CryptoView\CryptoView\obj\Debug\net8.0\scopedcss\Pages\Login.razor.rz.scp.css
 C:\Users\naiqu\Documents\Mis programas\CryptoView\CryptoView\obj\Debug\net8.0\scopedcss\projectbundle\CryptoView.bundle.scp.css
+C:\Users\naiqu\Documents\Mis programas\CryptoView\CryptoView\obj\Debug\net8.0\CryptoView.sourcelink.json
