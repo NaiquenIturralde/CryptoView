@@ -130,23 +130,33 @@ using (var scope = app.Services.CreateScope())
             END");
 
         // ── Admin seed / recovery ────────────────────────────────────────────────
-        // To reset the admin password:
-        //   1. Edit appsettings.Development.json → set AdminSeed:ForceReset = true
-        //      and AdminSeed:Password = "<your new password>"
-        //   2. Restart the app.
-        //   3. After logging in successfully, set ForceReset back to false.
         var adminCfg = app.Configuration.GetSection("AdminSeed");
         var adminUser = adminCfg["Username"] ?? "admin";
-        var adminPass = adminCfg["Password"] ?? "Admin123!";
-        var forceReset = bool.TryParse(adminCfg["ForceReset"], out var fr) && fr;
+        var adminPassEnv = Environment.GetEnvironmentVariable("CRYPTOVIEW_ADMIN_PASSWORD");
 
         var authService = services.GetRequiredService<CryptoView.Services.AuthService>();
-        await authService.EnsureAdminAsync(adminUser, adminPass, forceReset);
 
-        if (forceReset)
-            logger.LogWarning("[AuthService] Admin password was RESET. Set AdminSeed:ForceReset=false after logging in.");
+        // Check if admin already exists in DB
+        var adminExists = await context.AppUsers.AnyAsync(u => u.Role == "Admin");
+
+        if (!string.IsNullOrEmpty(adminPassEnv))
+        {
+            // Case 1: Variable is present -> Force update or create
+            logger.LogInformation("CRYPTOVIEW_ADMIN_PASSWORD detected. Updating Admin credentials...");
+            await authService.EnsureAdminAsync(adminUser, adminPassEnv, forceReset: true);
+        }
+        else if (adminExists)
+        {
+            // Case 2: Variable missing, but Admin exists in DB -> Do nothing (safe)
+            logger.LogInformation("Admin user found in DB. No password update required.");
+        }
         else
-            logger.LogInformation("[AuthService] Admin seed checked OK.");
+        {
+            // Case 3: Variable missing AND no Admin exists -> Critical Error
+            throw new InvalidOperationException(
+                "FATAL: No Admin user found and CRYPTOVIEW_ADMIN_PASSWORD is not set. " +
+                "Please set the environment variable to create the initial Admin account.");
+        }
 
         logger.LogInformation("Base de datos inicializada correctamente");
     }
