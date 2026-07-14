@@ -4,21 +4,23 @@
 @inject NavigationManager Nav
 @inject CryptoView.Services.ProfileService ProfileSvc
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.LocalizacionService Loc
+@implements IDisposable
 @using Microsoft.EntityFrameworkCore
 @using System.Text.Json
 
-<PageTitle>Editar Perfil - CryptoView</PageTitle>
+<PageTitle>@Loc["profile.edit.pageTitle"] - CryptoView</PageTitle>
 
 <div class="perfil-editar-container">
 
     <!-- Page Header -->
     <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="display-5 fw-bold text-warning mb-1">Editar perfil</h1>
-            <p class="text-muted lead mb-0">Actualizá tu información personal</p>
+            <h1 class="display-5 fw-bold text-warning mb-1">@Loc["profile.edit.title"]</h1>
+            <p class="text-muted lead mb-0">@Loc["profile.edit.subtitle"]</p>
         </div>
         <a href="perfil" class="btn btn-outline-info btn-sm">
-            <i class="bi bi-arrow-left me-1"></i>Volver
+            <i class="bi bi-arrow-left me-1"></i>@Loc["profile.edit.back"]
         </a>
     </div>
 
@@ -34,7 +36,7 @@
     <!-- ── SECCIÓN 1: Foto de perfil ── -->
     <div class="pref-card mb-4">
         <div class="pref-card-title">
-            <i class="bi bi-camera"></i> Foto de perfil
+            <i class="bi bi-camera"></i> @Loc["profile.edit.photoTitle"]
         </div>
 
         <div class="d-flex align-items-center gap-4 flex-wrap">
@@ -42,7 +44,7 @@
             <div class="avatar-preview-circle">
                 @if (photoDataUrl != null)
                 {
-                    <img src="@photoDataUrl" alt="Foto actual" />
+                    <img src="@photoDataUrl" alt="@Loc["profile.edit.currentPhoto"]" />
                 }
                 else if (!string.IsNullOrEmpty(selectedAvatarIcon))
                 {
@@ -58,17 +60,17 @@
             <div>
                 <div class="d-flex gap-2 flex-wrap mb-2">
                     <button class="btn btn-sm btn-outline-warning" @onclick="TriggerFilePicker">
-                        <i class="bi bi-upload me-1"></i>Subir foto
+                        <i class="bi bi-upload me-1"></i>@Loc["profile.edit.uploadPhoto"]
                     </button>
                     @if (photoDataUrl != null)
                     {
                         <button class="btn btn-sm btn-outline-danger" @onclick="RemovePhoto">
-                            <i class="bi bi-x-circle me-1"></i>Quitar foto
+                            <i class="bi bi-x-circle me-1"></i>@Loc["profile.edit.removePhoto"]
                         </button>
                     }
                 </div>
                 <small class="text-muted d-block" style="font-size:0.75rem;">
-                    Formatos permitidos: JPG, PNG, WEBP · Máx. 2 MB
+                    @Loc["profile.edit.allowedFormats"]
                 </small>
             </div>
         </div>
@@ -80,7 +82,7 @@
         <div class="mt-3">
             <small class="text-muted d-block mb-1"
                    style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">
-                O elegí un avatar predefinido
+                @Loc["profile.edit.chooseAvatar"]
             </small>
             <div class="avatar-options-grid">
                 @foreach (var icon in predefinedAvatars)
@@ -97,20 +99,22 @@
     <!-- ── SECCIÓN 2: Datos personales ── -->
     <div class="pref-card mb-4">
         <div class="pref-card-title">
-            <i class="bi bi-person-lines-fill"></i> Datos personales
+            <i class="bi bi-person-lines-fill"></i> @Loc["profile.edit.personalData"]
         </div>
 
         <div class="row g-3">
             <!-- Nombre / Apellido -->
             <div class="col-sm-6">
                 <label class="form-label text-muted"
-                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Nombre</label>
-                <input type="text" class="form-control" @bind="nombre" placeholder="Tu nombre" />
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">@Loc["profile.edit.firstName"]</label>
+                <input type="text" class="form-control" @bind="nombre"
+                       placeholder="@Loc["profile.edit.firstNamePlaceholder"]" />
             </div>
             <div class="col-sm-6">
                 <label class="form-label text-muted"
-                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Apellido</label>
-                <input type="text" class="form-control" @bind="apellido" placeholder="Tu apellido" />
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">@Loc["profile.edit.lastName"]</label>
+                <input type="text" class="form-control" @bind="apellido"
+                       placeholder="@Loc["profile.edit.lastNamePlaceholder"]" />
             </div>
 
             <!-- Email -->
@@ -126,7 +130,7 @@
             <!-- Nombre de usuario -->
             <div class="col-12">
                 <label class="form-label text-muted"
-                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Nombre de usuario</label>
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">@Loc["profile.edit.usernameLabel"]</label>
                 <div class="input-group">
                     <span class="input-group-text">@@</span>
                     <input type="text" class="form-control" @bind="username" placeholder="usuario" />
@@ -136,14 +140,15 @@
             <!-- Bio -->
             <div class="col-12">
                 <label class="form-label text-muted"
-                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">Bio / Descripción</label>
-                <textarea class="form-control" rows="3" @bind="bio" placeholder="Contá algo sobre vos..."></textarea>
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">@Loc["profile.edit.bioLabel"]</label>
+                <textarea class="form-control" rows="3" @bind="bio"
+                          placeholder="@Loc["profile.edit.bioPlaceholder"]"></textarea>
             </div>
 
             <!-- País -->
             <div class="col-12">
                 <label class="form-label text-muted"
-                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">País / Ubicación</label>
+                       style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">@Loc["profile.edit.countryLabel"]</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
                     <input type="text" class="form-control" @bind="pais" placeholder="Argentina" />
@@ -154,13 +159,13 @@
             <div class="col-12">
                 <label class="form-label text-muted d-block"
                        style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.04em;">
-                    Criptomonedas seguidas
+                    @Loc["profile.edit.followedCryptos"]
                 </label>
                 @if (cryptos.Count == 0)
                 {
                     <p class="text-muted small mb-0">
-                        <i class="bi bi-info-circle me-1"></i>No hay criptomonedas disponibles.
-                        <a href="cryptolist" class="text-warning">Agregá desde Mis Criptomonedas</a>.
+                        <i class="bi bi-info-circle me-1"></i>@Loc["profile.edit.noCryptos"]
+                        <a href="cryptolist" class="text-warning">@Loc["profile.edit.addFromList"]</a>.
                     </p>
                 }
                 else
@@ -188,17 +193,17 @@
     <!-- ── Acciones ── -->
     <div class="perfil-edit-actions">
         <button class="btn btn-outline-secondary" @onclick='() => Nav.NavigateTo("perfil")'>
-            <i class="bi bi-x-lg me-1"></i>Cancelar
+            <i class="bi bi-x-lg me-1"></i>@Loc["profile.edit.cancel"]
         </button>
         <button class="btn btn-primary" @onclick="SaveChanges" disabled="@isSaving">
             @if (isSaving)
             {
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                <span>Guardando...</span>
+                <span>@Loc["profile.edit.saving"]</span>
             }
             else
             {
-                <i class="bi bi-check-lg me-1"></i><span>Guardar cambios</span>
+                <i class="bi bi-check-lg me-1"></i><span>@Loc["profile.edit.saveChanges"]</span>
             }
         </button>
     </div>
@@ -217,7 +222,7 @@
 {
     <div class="save-success-toast">
         <i class="bi bi-check-circle-fill text-warning"></i>
-        Cambios guardados correctamente
+        @Loc["profile.edit.changesSaved"]
     </div>
 }
 
@@ -262,8 +267,13 @@
     private int _currentUserId = 0;
     private string? _currentUsername = null; // needed to write localStorage with same key as Perfil.razor
 
+    [CascadingParameter(Name = "AuthInitialized")] bool AuthInitialized { get; set; } = true;
+
     protected override async Task OnInitializedAsync()
     {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+
+        if (!AuthInitialized) return;
         if (!AuthStateSvc.IsAuthenticated())
         {
             Nav.NavigateTo("/login", forceLoad: true);
@@ -509,7 +519,7 @@
 
         if (_currentUserId <= 0)
         {
-            validationError = "Sesión inválida. Por favor, inicia sesión nuevamente.";
+            validationError = Loc["profile.edit.validation.invalidSession"];
             StateHasChanged();
             return;
         }
@@ -567,7 +577,7 @@
                 // Mostrar mensaje de éxito debajo del botón con scroll suave
                 isSaving = false;
                 saveResultIsSuccess = true;
-                saveResultMessage = "Perfil actualizado correctamente.";
+                saveResultMessage = Loc["profile.edit.profileUpdated"];
                 StateHasChanged();
                 await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
 
@@ -579,7 +589,7 @@
             {
                 isSaving = false;
                 saveResultIsSuccess = false;
-                saveResultMessage = "No se pudo guardar el perfil. Revisá los datos o intentá nuevamente.";
+                saveResultMessage = Loc["profile.edit.saveError"];
                 StateHasChanged();
                 await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
             }
@@ -588,11 +598,18 @@
         {
             isSaving = false;
             saveResultIsSuccess = false;
-            saveResultMessage = "No se pudo guardar el perfil. Revisá los datos o intentá nuevamente.";
+            saveResultMessage = Loc["profile.edit.saveError"];
             await JS.InvokeVoidAsync("console.error", $"[EditarPerfil] Error en SaveChanges: {ex}");
             StateHasChanged();
             await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
         }
     }
 
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
+    }
 }

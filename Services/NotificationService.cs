@@ -23,6 +23,9 @@ namespace CryptoView.Services
         public NotificationType Type { get; init; }
         public string Title { get; init; } = string.Empty;
         public string Message { get; init; } = string.Empty;
+        public string? TitleKey { get; set; }
+        public string? MessageKey { get; set; }
+        public string[]? MessageArgs { get; set; }
         public DateTime CreatedAt { get; init; } = DateTime.Now;
         public bool IsRead { get; set; }
         public NotificationPriority Priority { get; init; } = NotificationPriority.Normal;
@@ -173,6 +176,75 @@ namespace CryptoView.Services
 
             if (isDuplicate) return;
 
+            AddCore(type, title, message, priority);
+        }
+
+        /// <summary>
+        /// Agrega una notificación con claves de localización.
+        /// El título y mensaje se resolverán en tiempo de visualización.
+        /// </summary>
+        public void AddLocalized(
+            NotificationType type,
+            string titleKey,
+            string messageKey,
+            string[]? messageArgs = null,
+            NotificationPriority priority = NotificationPriority.Normal,
+            string? fallbackTitle = null,
+            string? fallbackMessage = null)
+        {
+            // Deduplicación por TitleKey + MessageKey
+            bool isDuplicate = _notifications.Any(n =>
+                n.Type == type &&
+                n.TitleKey == titleKey &&
+                n.MessageKey == messageKey &&
+                (DateTime.Now - n.CreatedAt) < DedupWindow);
+
+            if (isDuplicate) return;
+
+            AddCore(type, fallbackTitle ?? titleKey, fallbackMessage ?? messageKey, priority, titleKey, messageKey, messageArgs);
+        }
+
+        // ── Métodos de visualización localizada ──────────────────────────────
+
+        /// <summary>Obtiene el título localizado para una notificación.</summary>
+        public static string GetDisplayTitle(AppNotification n, LocalizacionService loc)
+            => !string.IsNullOrEmpty(n.TitleKey) ? loc[n.TitleKey] : n.Title;
+
+        /// <summary>Obtiene el mensaje localizado para una notificación.</summary>
+        public static string GetDisplayMessage(AppNotification n, LocalizacionService loc)
+        {
+            if (!string.IsNullOrEmpty(n.MessageKey))
+            {
+                // [TEMP] Diagnóstico — eliminar antes de producción
+                Console.WriteLine($"[NotifDebug] Key={n.MessageKey}; ArgsCount={n.MessageArgs?.Length ?? 0}; Args=[{string.Join(" | ", n.MessageArgs ?? Array.Empty<string>())}]");
+
+                var result = n.MessageArgs is { Length: > 0 }
+                    ? loc.Format(n.MessageKey, n.MessageArgs)
+                    : loc[n.MessageKey];
+
+                // Si el resultado contiene placeholders sin resolver, usar Message como fallback
+                if (!string.IsNullOrEmpty(result) && System.Text.RegularExpressions.Regex.IsMatch(result, @"\{\d+[^}]*\}"))
+                {
+                    return !string.IsNullOrEmpty(n.Message) && !System.Text.RegularExpressions.Regex.IsMatch(n.Message, @"\{\d+[^}]*\}")
+                        ? n.Message
+                        : result; // último recurso: devolver el template con placeholders visibles
+                }
+                return result;
+            }
+            return n.Message;
+        }
+
+        // ── Método interno de inserción compartido ──────────────────────────
+
+        private void AddCore(
+            NotificationType type,
+            string title,
+            string message,
+            NotificationPriority priority,
+            string? titleKey = null,
+            string? messageKey = null,
+            string[]? messageArgs = null)
+        {
             // Respetar el límite: eliminar las más antiguas si es necesario
             while (_notifications.Count >= MaxNotifications)
             {
@@ -186,6 +258,9 @@ namespace CryptoView.Services
                 Type = type,
                 Title = title,
                 Message = message,
+                TitleKey = titleKey,
+                MessageKey = messageKey,
+                MessageArgs = messageArgs,
                 Priority = priority,
                 CreatedAt = DateTime.Now
             });
@@ -237,9 +312,11 @@ namespace CryptoView.Services
         public void LoadFromStorage(IEnumerable<AppNotification> stored)
         {
             _notifications.Clear();
-            // Respetar el límite y el orden al restaurar
-            _notifications.AddRange(
-                stored.OrderByDescending(n => n.CreatedAt).Take(MaxNotifications));
+            foreach (var n in stored.OrderByDescending(n => n.CreatedAt).Take(MaxNotifications))
+            {
+                MigrateHistoricalNotification(n);
+                _notifications.Add(n);
+            }
             // No se invoca OnChanged — el componente gestiona el re-render
         }
 
@@ -249,20 +326,25 @@ namespace CryptoView.Services
         public void NotifyPriceUpdateSuccess(int updatedCount)
         {
             string plural = updatedCount == 1 ? "criptomoneda" : "criptomonedas";
-            Add(
+            AddLocalized(
                 NotificationType.Success,
-                "Precios actualizados",
-                $"Se actualizaron los precios de {updatedCount} {plural} correctamente.");
+                "notifications.updateSuccess.title",
+                "notifications.updateSuccess.message",
+                messageArgs: new[] { updatedCount.ToString(), updatedCount == 1 ? "criptomoneda" : "criptomonedas" },
+                fallbackTitle: "Precios actualizados",
+                fallbackMessage: $"Se actualizaron los precios de {updatedCount} {plural} correctamente.");
         }
 
         /// <summary>Notificación de error al obtener datos de la API.</summary>
         public void NotifyPriceUpdateError()
         {
-            Add(
+            AddLocalized(
                 NotificationType.Danger,
-                "Error de actualización",
-                "No se pudieron obtener los datos de una o más criptomonedas.",
-                NotificationPriority.High);
+                "notifications.updateError.title",
+                "notifications.updateError.message",
+                priority: NotificationPriority.High,
+                fallbackTitle: "Error de actualización",
+                fallbackMessage: "No se pudieron obtener los datos de una o más criptomonedas.");
         }
 
         /// <summary>
@@ -273,11 +355,15 @@ namespace CryptoView.Services
         {
             string direction = changePercent > 0 ? "subió" : "bajó";
             string sign = changePercent > 0 ? "+" : "";
-            Add(
+            string directionEn = changePercent > 0 ? "rose" : "fell";
+            AddLocalized(
                 NotificationType.Warning,
-                "Movimiento importante detectado",
-                $"{coinName} {direction} {sign}{changePercent:F2}% en la última actualización.",
-                NotificationPriority.High);
+                "notifications.priceMovement.title",
+                "notifications.priceMovement.message",
+                messageArgs: new[] { coinName, direction, $"{sign}{changePercent:F2}%" },
+                priority: NotificationPriority.High,
+                fallbackTitle: "Movimiento importante detectado",
+                fallbackMessage: $"{coinName} {direction} {sign}{changePercent:F2}% en la última actualización.");
         }
 
         /// <summary>
@@ -316,38 +402,122 @@ namespace CryptoView.Services
 
             if (isUp)
             {
-                Add(
+                AddLocalized(
                     NotificationType.Success,
-                    "Suba importante detectada",
-                    $"{coinName} subió más de {PriceChangeThreshold:F0}% desde la última actualización ({delta:+0.00}%).",
-                    NotificationPriority.High);
+                    "notifications.priceAlertUp.title",
+                    "notifications.priceAlertUp.message",
+                    messageArgs: new[] { coinName, $"{PriceChangeThreshold:F0}%", $"{delta:+0.00}%" },
+                    priority: NotificationPriority.High,
+                    fallbackTitle: "Suba importante detectada",
+                    fallbackMessage: $"{coinName} subió más de {PriceChangeThreshold:F0}% desde la última actualización ({delta:+0.00}%).");
             }
             else
             {
-                Add(
+                AddLocalized(
                     NotificationType.Warning,
-                    "Baja importante detectada",
-                    $"{coinName} bajó más de {PriceChangeThreshold:F0}% desde la última actualización ({delta:F2}%).",
-                    NotificationPriority.High);
+                    "notifications.priceAlertDown.title",
+                    "notifications.priceAlertDown.message",
+                    messageArgs: new[] { coinName, $"{PriceChangeThreshold:F0}%", $"{delta:F2}%" },
+                    priority: NotificationPriority.High,
+                    fallbackTitle: "Baja importante detectada",
+                    fallbackMessage: $"{coinName} bajó más de {PriceChangeThreshold:F0}% desde la última actualización ({delta:F2}%).");
             }
         }
 
         /// <summary>Notificación al agregar una criptomoneda a la lista.</summary>
         public void NotifyCryptoAdded(string coinName)
         {
-            Add(
+            AddLocalized(
                 NotificationType.Info,
-                "Criptomoneda agregada",
-                $"Se agregó {coinName} a tu lista de seguimiento.");
+                "notifications.cryptoAdded.title",
+                "notifications.cryptoAdded.message",
+                messageArgs: new[] { coinName },
+                fallbackTitle: "Criptomoneda agregada",
+                fallbackMessage: $"Se agregó {coinName} a tu lista de seguimiento.");
         }
 
         /// <summary>Notificación al eliminar una criptomoneda de la lista.</summary>
         public void NotifyCryptoDeleted(string coinName)
         {
-            Add(
+            AddLocalized(
                 NotificationType.Info,
-                "Criptomoneda eliminada",
-                $"{coinName} fue eliminada de tu lista de seguimiento.");
+                "notifications.cryptoDeleted.title",
+                "notifications.cryptoDeleted.message",
+                messageArgs: new[] { coinName },
+                fallbackTitle: "Criptomoneda eliminada",
+                fallbackMessage: $"{coinName} fue eliminada de tu lista de seguimiento.");
+        }
+
+        /// <summary>
+        /// Migra notificaciones históricas guardadas con títulos hardcodeados
+        /// para que tengan TitleKey/MessageKey y se muestren localizadas.
+        /// No re-persiste a localStorage.
+        /// </summary>
+        private static void MigrateHistoricalNotification(AppNotification n)
+        {
+            if (!string.IsNullOrEmpty(n.TitleKey)) return; // ya migrada
+
+            var msg = n.Message ?? string.Empty;
+
+            switch (n.Title)
+            {
+                case "Precios actualizados":
+                    n.TitleKey = "notifications.updateSuccess.title";
+                    n.MessageKey = "notifications.updateSuccess.message";
+                    // Extraer cantidad de monedas: "Se actualizaron los precios de X criptomonedas..."
+                    var qtyMatch = System.Text.RegularExpressions.Regex.Match(msg, @"\d+");
+                    if (qtyMatch.Success)
+                        n.MessageArgs = new[] { qtyMatch.Value, qtyMatch.Value == "1" ? "criptomoneda" : "criptomonedas" };
+                    break;
+                case "Error de actualización":
+                    n.TitleKey = "notifications.updateError.title";
+                    n.MessageKey = "notifications.updateError.message";
+                    break;
+                case "Movimiento importante detectado":
+                    n.TitleKey = "notifications.priceMovement.title";
+                    n.MessageKey = "notifications.priceMovement.message";
+                    // Formato: "{name} subió/bajó {sign}{change}%..."
+                    var moveMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^(.+?)\s+(subió|bajó|rose|fell)\s+(.+)\s+en la");
+                    if (moveMatch.Success && moveMatch.Groups.Count >= 4)
+                        n.MessageArgs = new[] { moveMatch.Groups[1].Value.Trim(), moveMatch.Groups[2].Value, moveMatch.Groups[3].Value.Trim() };
+                    break;
+                case "Suba importante detectada":
+                    n.TitleKey = "notifications.priceAlertUp.title";
+                    n.MessageKey = "notifications.priceAlertUp.message";
+                    // Formato: "{name} subió más de {threshold}%...({delta}%)"
+                    var upMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^(.+?)\s+subió\s+más de\s+(.+?)%\s+desde la última actualización\s+\((.+?)\)\.");
+                    if (upMatch.Success && upMatch.Groups.Count >= 4)
+                        n.MessageArgs = new[] { upMatch.Groups[1].Value.Trim(), upMatch.Groups[2].Value.Trim() + "%", upMatch.Groups[3].Value.Trim() };
+                    break;
+                case "Baja importante detectada":
+                    n.TitleKey = "notifications.priceAlertDown.title";
+                    n.MessageKey = "notifications.priceAlertDown.message";
+                    // Formato: "{name} bajó más de {threshold}%...({delta}%)"
+                    var downMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^(.+?)\s+bajó\s+más de\s+(.+?)%\s+desde la última actualización\s+\((.+?)\)\.");
+                    if (downMatch.Success && downMatch.Groups.Count >= 4)
+                        n.MessageArgs = new[] { downMatch.Groups[1].Value.Trim(), downMatch.Groups[2].Value.Trim() + "%", downMatch.Groups[3].Value.Trim() };
+                    break;
+                case "Criptomoneda agregada":
+                    n.TitleKey = "notifications.cryptoAdded.title";
+                    n.MessageKey = "notifications.cryptoAdded.message";
+                    // Formato: "Se agregó {name} a tu lista..."
+                    var addMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^Se agregó\s+(.+?)\s+a tu");
+                    if (!addMatch.Success)
+                        addMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^(.+?)\s+was added");
+                    if (addMatch.Success)
+                        n.MessageArgs = new[] { addMatch.Groups[1].Value.Trim() };
+                    break;
+                case "Criptomoneda eliminada":
+                    n.TitleKey = "notifications.cryptoDeleted.title";
+                    n.MessageKey = "notifications.cryptoDeleted.message";
+                    // Formato: "{name} fue eliminada de tu lista..." o "{name} was removed..."
+                    var delMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^(.+?)\s+fue eliminada");
+                    if (!delMatch.Success)
+                        delMatch = System.Text.RegularExpressions.Regex.Match(msg, @"^(.+?)\s+was removed");
+                    if (delMatch.Success)
+                        n.MessageArgs = new[] { delMatch.Groups[1].Value.Trim() };
+                    break;
+            }
         }
     }
 }

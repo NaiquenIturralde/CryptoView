@@ -1,18 +1,19 @@
 @implements IDisposable
 @inject NotificationService NotificationSvc
+@inject CryptoView.Services.LocalizacionService Loc
 @inject IJSRuntime JS
 @using System.Text.Json
 
-<div class="notif-wrapper" @onkeydown="OnWrapperKeyDown">
+<div class="notif-wrapper" @onkeydown="OnWrapperKeyDown" data-tutorial="notifications">
 
     <button class="notif-bell-btn @(isOpen ? "notif-bell-btn--raised" : "")" @onclick="ToggleDropdown"
-            @onclick:stopPropagation="true" aria-label="Notificaciones" aria-expanded="@isOpen.ToString().ToLower()"
-            aria-haspopup="true">
+            @onclick:stopPropagation="true" aria-label="@Loc["notifications.bellLabel"]"
+            aria-expanded="@isOpen.ToString().ToLower()" aria-haspopup="true">
         <i class="bi bi-bell fs-5"></i>
         @if (NotificationSvc.UnreadCount > 0)
         {
             <span class="notification-badge @(_pulseActive ? "has-notifications" : "")"
-                  aria-label="@NotificationSvc.UnreadCount notificaciones no leídas" aria-live="polite">
+                  aria-label="@NotificationSvc.UnreadCount @Loc["notifications.unreadLabel"]" aria-live="polite">
                 @(NotificationSvc.UnreadCount > 9 ? "9+" : NotificationSvc.UnreadCount.ToString())
             </span>
         }
@@ -22,21 +23,21 @@
     {
         <div class="notif-backdrop" @onclick="CloseDropdown" aria-hidden="true"></div>
 
-        <div class="notif-panel" role="dialog" aria-label="Panel de notificaciones" aria-modal="true">
+        <div class="notif-panel" role="dialog" aria-label="@Loc["notifications.panelLabel"]" aria-modal="true">
             <div class="notif-panel-header">
-                <span class="notif-title">Notificaciones</span>
+                <span class="notif-title">@Loc["notifications.title"]</span>
                 <div class="notif-header-actions">
                     @if (NotificationSvc.UnreadCount > 0)
                     {
                         <button class="notif-mark-all-btn" @onclick="() => NotificationSvc.MarkAllAsRead()"
                                 @onclick:stopPropagation="true">
-                            Marcar todas
+                            @Loc["notifications.markAllRead"]
                         </button>
                     }
                     @if (NotificationSvc.All.Any())
                     {
                         <button class="notif-clear-btn" @onclick="ClearAllAsync" @onclick:stopPropagation="true"
-                                title="Limpiar todas las notificaciones" aria-label="Limpiar notificaciones">
+                                title="@Loc["notifications.clearAllTitle"]" aria-label="@Loc["notifications.clearAllAria"]">
                             <i class="bi bi-trash3"></i>
                         </button>
                     }
@@ -47,7 +48,7 @@
             {
                 <div class="notif-empty">
                     <i class="bi bi-bell-slash"></i>
-                    <span>No hay notificaciones por el momento</span>
+                    <span>@Loc["notifications.empty"]</span>
                 </div>
             }
             else
@@ -58,13 +59,13 @@
                         var n = notif;
                         <li class="notif-item @(n.IsRead ? "read" : "unread")" @onclick="() => OpenModal(n)"
                             @onclick:stopPropagation="true" @onkeydown="(e) => OnItemKeyDown(e, n)" tabindex="0" role="button"
-                            aria-label="@n.Title — @n.Message">
+                            aria-label="@NotificationService.GetDisplayTitle(n, Loc) — @NotificationService.GetDisplayMessage(n, Loc)">
                             <div class="notif-icon-wrap notif-icon-@n.TypeName">
                                 <i class="bi @n.IconClass"></i>
                             </div>
                             <div class="notif-content">
-                                <div class="notif-item-title">@n.Title</div>
-                                <div class="notif-item-desc">@n.Message</div>
+                                <div class="notif-item-title">@NotificationService.GetDisplayTitle(n, Loc)</div>
+                                <div class="notif-item-desc">@NotificationService.GetDisplayMessage(n, Loc)</div>
                                 <div class="notif-item-time">@FormatTimestamp(n.CreatedAt)</div>
                             </div>
                             @if (!n.IsRead)
@@ -174,6 +175,37 @@
 
         100% {
             transform: scale(1);
+        }
+    }
+
+    /* ── Responsive: badge grows on small screens for readability ── */
+    @@media (max-width: 768px) {
+        .notification-badge {
+            top: -3px;
+            right: -4px;
+            font-size: 10px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            border-radius: 8px;
+            background-color: #ff7a00;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+    }
+
+    @@media (max-width: 430px) {
+        .notification-badge {
+            top: -2px;
+            right: -3px;
+            font-size: 10px;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            border-radius: 8px;
         }
     }
 
@@ -694,6 +726,7 @@
     {
         _previousUnreadCount = NotificationSvc.UnreadCount;
         NotificationSvc.OnChanged += HandleNotificationChanged;
+        Loc.OnLanguageChanged += HandleLanguageChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -734,9 +767,13 @@
         });
     }
 
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
         NotificationSvc.OnChanged -= HandleNotificationChanged;
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
     }
 
     // ── Persistencia localStorage ─────────────────────────────────────────────
@@ -756,7 +793,11 @@
             {
                 var stored = JsonSerializer.Deserialize<List<AppNotification>>(json, _jsonOpts);
                 if (stored is { Count: > 0 })
+                {
                     NotificationSvc.LoadFromStorage(stored);
+                    // Re-persistir para que la migración quede guardada
+                    await SaveToStorageAsync();
+                }
             }
         }
         catch

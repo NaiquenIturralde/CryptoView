@@ -2,28 +2,30 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.LocalizacionService Loc
+@implements IDisposable
 @using System.Text.Json
 
-<PageTitle>Preferencias - CryptoView</PageTitle>
+<PageTitle>@Loc["preferences.pageTitle"] - CryptoView</PageTitle>
 
 <div class="page-container preferences-container">
     <!-- Page Header -->
     <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="display-5 fw-bold text-warning mb-1">Preferencias</h1>
-            <p class="text-muted lead mb-0">Configurá tu experiencia en CryptoView</p>
+            <h1 class="display-5 fw-bold text-warning mb-1">@Loc["preferences.title"]</h1>
+            <p class="text-muted lead mb-0">@Loc["preferences.subtitle"]</p>
         </div>
     </div>
 
     <!-- Tema -->
     <div class="pref-card">
         <div class="pref-card-title">
-            <i class="bi bi-palette"></i> Apariencia
+            <i class="bi bi-palette"></i> @Loc["preferences.appearance"]
         </div>
         <div class="pref-row">
             <div>
-                <div class="pref-label">Tema oscuro</div>
-                <div class="pref-sublabel">Interfaz oscura optimizada para lectura de datos</div>
+                <div class="pref-label">@Loc["preferences.darkTheme"]</div>
+                <div class="pref-sublabel">@Loc["preferences.darkThemeDesc"]</div>
             </div>
             <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" role="switch" checked="@isDark" @onchange="SaveTheme" />
@@ -34,80 +36,81 @@
     <!-- Preferencias de visualización -->
     <div class="pref-card">
         <div class="pref-card-title">
-            <i class="bi bi-sliders"></i> Preferencias de visualización
+            <i class="bi bi-sliders"></i> @Loc["preferences.displayPrefs"]
         </div>
         <div class="pref-row">
             <div>
-                <div class="pref-label"><i class="bi bi-currency-exchange me-1"></i>Moneda preferida</div>
-                <div class="pref-sublabel">Los valores del dashboard se expresarán en esta moneda</div>
-            </div>
-            <CurrencySelect CssClass="preferences-currency-select" SelectedCurrency="@currency"
-                            SelectedCurrencyChanged="@(v => currency = v)" />
-        </div>
-    </div>
-
-    <!-- Notificaciones -->
-    <div class="pref-card">
-        <div class="pref-card-title">
-            <i class="bi bi-bell"></i> Notificaciones
-        </div>
-        <div class="pref-row">
-            <div>
-                <div class="pref-label">Alertas de precio</div>
-                <div class="pref-sublabel">Recibir avisos cuando una cripto suba o baje más del 5%</div>
-            </div>
-            <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" @bind="notifications" />
-            </div>
-        </div>
-    </div>
-
-    <!-- Auto-refresh -->
-    <div class="pref-card">
-        <div class="pref-card-title">
-            <i class="bi bi-arrow-repeat"></i> Actualización Automática
-        </div>
-        <div class="pref-row">
-            <div>
-                <div class="pref-label">Actualizar precios automáticamente</div>
-                <div class="pref-sublabel">Refresca los datos sin intervención manual</div>
-            </div>
-            <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" @bind="autoRefresh" />
-            </div>
-        </div>
-        @if (autoRefresh)
-        {
-            <div class="pref-row mt-2">
-                <div>
-                    <div class="pref-label">Intervalo de actualización</div>
-                    <div class="pref-sublabel">¿Con qué frecuencia se consultan los precios?</div>
+                <div class="pref-label"><i
+                    class="bi bi-currency-exchange me-1"></i>@Loc["preferences.preferredCurrency"]</div>
+                    <div class="pref-sublabel">@Loc["preferences.preferredCurrencyDesc"]</div>
                 </div>
-                <select class="form-select form-select-sm w-auto" @bind="refreshInterval">
-                    <option value="1">Cada 1 minuto</option>
-                    <option value="5">Cada 5 minutos</option>
-                    <option value="10">Cada 10 minutos</option>
-                    <option value="30">Cada 30 minutos</option>
-                </select>
+                <CurrencySelect CssClass="preferences-currency-select" SelectedCurrency="@currency"
+                                SelectedCurrencyChanged="@(v => currency = v)" />
             </div>
-        }
-    </div>
+        </div>
 
-    <!-- Save button + feedback -->
-    <div class="d-flex align-items-center gap-3 flex-wrap">
-        <button class="btn btn-primary btn-lg" @onclick="SavePreferences">
-            <i class="bi bi-check-circle me-2"></i>Guardar cambios
-        </button>
-        @if (saved)
-        {
-            <div class="alert alert-success mb-0 py-2 px-3 d-flex align-items-center gap-2"
-                 style="border-radius: 10px; background: rgba(57,255,20,0.12); border-left: 4px solid #39ff14; color: #39ff14;">
-                <i class="bi bi-check-circle-fill"></i>
-                Preferencias guardadas correctamente.
+        <!-- Notificaciones -->
+        <div class="pref-card">
+            <div class="pref-card-title">
+                <i class="bi bi-bell"></i> @Loc["preferences.notifications"]
             </div>
-        }
+            <div class="pref-row">
+                <div>
+                    <div class="pref-label">@Loc["preferences.priceAlerts"]</div>
+                    <div class="pref-sublabel">@Loc["preferences.priceAlertsDesc"]</div>
+                </div>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" @bind="notifications" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Auto-refresh -->
+        <div class="pref-card">
+            <div class="pref-card-title">
+                <i class="bi bi-arrow-repeat"></i> @Loc["preferences.autoRefresh"]
+            </div>
+            <div class="pref-row">
+                <div>
+                    <div class="pref-label">@Loc["preferences.autoRefreshPrices"]</div>
+                    <div class="pref-sublabel">@Loc["preferences.autoRefreshPricesDesc"]</div>
+                </div>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" @bind="autoRefresh" />
+                </div>
+            </div>
+            @if (autoRefresh)
+            {
+                <div class="pref-row mt-2">
+                    <div>
+                        <div class="pref-label">@Loc["preferences.updateInterval"]</div>
+                        <div class="pref-sublabel">@Loc["preferences.updateIntervalDesc"]</div>
+                    </div>
+                    <select class="form-select form-select-sm w-auto" @bind="refreshInterval">
+                        <option value="1">@Loc["preferences.interval.1min"]</option>
+                        <option value="5">@Loc["preferences.interval.5min"]</option>
+                        <option value="10">@Loc["preferences.interval.10min"]</option>
+                        <option value="30">@Loc["preferences.interval.30min"]</option>
+                    </select>
+                </div>
+            }
+        </div>
+
+        <!-- Save button + feedback -->
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <button class="btn btn-primary btn-lg" @onclick="SavePreferences">
+                <i class="bi bi-check-circle me-2"></i>@Loc["preferences.saveChanges"]
+            </button>
+            @if (saved)
+            {
+                <div class="alert alert-success mb-0 py-2 px-3 d-flex align-items-center gap-2"
+                     style="border-radius: 10px; background: rgba(57,255,20,0.12); border-left: 4px solid #39ff14; color: #39ff14;">
+                    <i class="bi bi-check-circle-fill"></i>
+                    @Loc["preferences.savedSuccess"]
+                </div>
+            }
+        </div>
     </div>
-</div>
 
 @code {
     private bool isDark = true;
@@ -117,13 +120,26 @@
     private int refreshInterval = 5;
     private bool saved = false;
 
+    [CascadingParameter(Name = "AuthInitialized")] bool AuthInitialized { get; set; } = true;
+
     protected override async Task OnInitializedAsync()
     {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+
+        if (!AuthInitialized) return;
         if (!AuthStateSvc.IsAuthenticated())
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
+    }
+
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

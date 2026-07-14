@@ -42,12 +42,14 @@ namespace CryptoView.Services
 
         /// <summary>
         /// Registers a new user with role "Usuario".
+        /// Creates AppUser + UserProfile with FullName.
         /// Returns (true, "") on success or (false, errorMessage) on failure.
         ///
         /// Role is hardcoded to "Usuario" — there is no parameter for it.
         /// </summary>
         public async Task<(bool ok, string error)> RegisterAsync(
-            string username, string password, string? email)
+            string username, string password, string? email,
+            string firstName, string lastName)
         {
             username = username.Trim();
 
@@ -68,6 +70,23 @@ namespace CryptoView.Services
 
             _db.AppUsers.Add(user);
             await _db.SaveChangesAsync();
+
+            // ── Create UserProfile with FullName ──────────────────────────────
+            var fullName = $"{firstName.Trim()} {lastName.Trim()}".Trim();
+            var profileEmail = string.IsNullOrWhiteSpace(email) ? string.Empty : email.Trim();
+
+            var profile = new UserProfile
+            {
+                UserId = user.Id,
+                FullName = fullName,
+                Email = profileEmail,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _db.UserProfiles.Add(profile);
+            await _db.SaveChangesAsync();
+
             return (true, string.Empty);
         }
 
@@ -91,6 +110,7 @@ namespace CryptoView.Services
 
             if (admin is null)
             {
+                Console.WriteLine($"[AdminSeed] No admin user found. Creating new admin: {username}");
                 _db.AppUsers.Add(new AppUser
                 {
                     Username = username,
@@ -99,12 +119,19 @@ namespace CryptoView.Services
                     CreatedAt = DateTime.UtcNow
                 });
                 await _db.SaveChangesAsync();
+                Console.WriteLine("[AdminSeed] New admin user created. SaveChangesAsync completed.");
             }
             else if (forceReset)
             {
                 // Reset the existing admin — never duplicate
+                Console.WriteLine($"[AdminSeed] Admin user found (Id={admin.Id}, Username={admin.Username}). Updating password hash...");
                 admin.PasswordHash = BC.HashPassword(password, workFactor: 12);
                 await _db.SaveChangesAsync();
+                Console.WriteLine("[AdminSeed] Admin password hash updated. SaveChangesAsync completed.");
+            }
+            else
+            {
+                Console.WriteLine($"[AdminSeed] Admin user found (Id={admin.Id}). forceReset=false, no changes made.");
             }
         }
     }

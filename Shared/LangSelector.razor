@@ -1,0 +1,85 @@
+@inject CryptoView.Services.LocalizacionService Loc
+@implements IDisposable
+
+<div class="lang-selector" @onkeydown="OnContainerKeyDown" data-tutorial="language-selector">
+    <button type="button" class="lang-selector-trigger" @onclick="ToggleDropdown" @onclick:stopPropagation="true"
+            aria-label="@Loc["lang.selectLanguage"]" aria-expanded="@_open.ToString().ToLower()"
+            aria-controls="lang-selector-panel">
+        <i class="bi bi-globe2"></i>
+        <span class="lang-selector-code">@Loc.Language.ToUpperInvariant()</span>
+        <i class="bi bi-chevron-down lang-selector-caret"></i>
+    </button>
+
+    @if (_open)
+    {
+        <div class="lang-selector-backdrop" @onclick="Close" aria-hidden="true"></div>
+        <div id="lang-selector-panel" class="lang-selector-panel">
+            <button type="button" class="@SpanishItemClass" aria-pressed="@(Loc.Language == "es")" @onclick="SelectSpanish">
+                <span class="lang-selector-item-code">ES</span>
+                <span class="lang-selector-item-name">@Loc["lang.es"]</span>
+            </button>
+            <button type="button" class="@EnglishItemClass" aria-pressed="@(Loc.Language == "en")" @onclick="SelectEnglish">
+                <span class="lang-selector-item-code">EN</span>
+                <span class="lang-selector-item-name">@Loc["lang.en"]</span>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+
+    private string SpanishItemClass =>
+        Loc.Language == "es"
+            ? "lang-selector-item selected"
+            : "lang-selector-item";
+
+    private string EnglishItemClass =>
+        Loc.Language == "en"
+            ? "lang-selector-item selected"
+            : "lang-selector-item";
+
+    protected override void OnInitialized()
+    {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+    }
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
+    }
+
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
+    private void ToggleDropdown()
+    {
+        _open = !_open;
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        _open = false;
+        StateHasChanged();
+    }
+
+    private Task SelectSpanish() => SelectLanguage("es");
+
+    private Task SelectEnglish() => SelectLanguage("en");
+
+    private async Task SelectLanguage(string lang)
+    {
+        _open = false;
+        await Loc.SetLanguageAsync(lang);
+    }
+
+    private void OnContainerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && _open)
+        {
+            _open = false;
+            StateHasChanged();
+        }
+    }
+}

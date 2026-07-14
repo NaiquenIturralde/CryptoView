@@ -1,0 +1,94 @@
+.lang-selector {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.lang-selector-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    height: 34px;
+    padding: 0 0.65rem;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    appearance: none;
+}
+
+.lang-selector-trigger:hover {
+    background: rgba(255, 122, 0, 0.10);
+    border-color: rgba(255, 122, 0, 0.35);
+}
+
+.lang-selector-code {
+    letter-spacing: 0.03em;
+    font-size: 0.82rem;
+    line-height: 1;
+}
+
+.lang-selector-caret {
+    font-size: 0.65rem;
+    opacity: 0.6;
+}
+
+.lang-selector-panel {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    z-index: 2020;
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+    padding: 0.35rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.40);
+}
+
+.lang-selector-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    appearance: none;
+}
+
+.lang-selector-item:hover {
+    background: rgba(255, 122, 0, 0.13);
+}
+
+.lang-selector-item.selected {
+    background: rgba(255, 122, 0, 0.18);
+    color: var(--accent);
+}
+
+.lang-selector-item-code {
+    font-weight: 700;
+    font-size: 0.78rem;
+    color: var(--accent);
+}
+
+.lang-selector-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2010;
+}

@@ -1,11 +1,13 @@
 @page "/login"
 @layout EmptyLayout
+@implements IDisposable
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject CryptoView.Services.AuthService AuthSvc
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.LocalizacionService Loc
 
-<PageTitle>Iniciar sesión - CryptoView</PageTitle>
+<PageTitle>@Loc["login.pageTitle"] - CryptoView</PageTitle>
 
 @if (showRegister)
 {
@@ -13,7 +15,7 @@
     <div class="login-wrapper">
         <div class="login-card">
 
-            <button class="login-close-btn" @onclick="CloseRegister" title="Volver a login">
+            <button class="login-close-btn" @onclick="CloseRegister" title="@Loc["login.backToLogin"]">
                 <i class="bi bi-x-lg"></i>
             </button>
 
@@ -28,38 +30,54 @@
                               stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
                 </svg>
                 <h2 class="login-title">CryptoView</h2>
-                <p class="login-subtitle">Dashboard Educativo</p>
+                <p class="login-subtitle">@Loc["login.subtitle"]</p>
             </div>
 
-            <h5 class="login-heading mb-3 text-center">Crear cuenta</h5>
+            <h5 class="login-heading mb-3 text-center">@Loc["register.title"]</h5>
 
             <div class="mb-3">
-                <label class="form-label login-label" for="reg-username">Usuario</label>
+                <label class="form-label login-label" for="reg-nombre">@Loc["profile.edit.firstName"]</label>
+                <input id="reg-nombre" type="text" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regNombre"
+                       placeholder="@Loc["profile.edit.firstNamePlaceholder"]" autocomplete="given-name"
+                       aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="reg-apellido">@Loc["profile.edit.lastName"]</label>
+                <input id="reg-apellido" type="text" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regApellido"
+                       placeholder="@Loc["profile.edit.lastNamePlaceholder"]" autocomplete="family-name"
+                       aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
+                       @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label login-label" for="reg-username">@Loc["register.username"]</label>
                 <input id="reg-username" type="text" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regUsername"
-                       placeholder="Elegí un nombre de usuario" autocomplete="username"
+                       placeholder="@Loc["register.usernamePlaceholder"]" autocomplete="username"
                        aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
                        @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label login-label" for="reg-email">Email <span class="login-optional">(opcional)</span></label>
-                <input id="reg-email" type="email" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regEmail" placeholder="tu@email.com" autocomplete="email"
+                <label class="form-label login-label" for="reg-email">@Loc["register.email"] <span class="login-optional">@Loc["register.emailOptional"]</span></label>
+                <input id="reg-email" type="email" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regEmail" placeholder="@Loc["register.emailPlaceholder"]" autocomplete="email"
                        aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
                        @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label login-label" for="reg-password">Contraseña</label>
+                <label class="form-label login-label" for="reg-password">@Loc["register.password"]</label>
                 <input id="reg-password" type="password" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regPassword"
-                       placeholder="Elegí una contraseña" autocomplete="new-password"
+                       placeholder="@Loc["register.passwordPlaceholder"]" autocomplete="new-password"
                        aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
                        @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
             </div>
 
             <div class="mb-4">
-                <label class="form-label login-label" for="reg-confirm">Confirmar contraseña</label>
+                <label class="form-label login-label" for="reg-confirm">@Loc["register.confirmPassword"]</label>
                 <input id="reg-confirm" type="password" class="form-control login-input @(!string.IsNullOrEmpty(regError) ? "input-error" : "")" @bind="regConfirm"
-                       placeholder="Repetí tu contraseña" autocomplete="new-password"
+                       placeholder="@Loc["register.confirmPlaceholder"]" autocomplete="new-password"
                        aria-describedby="@(!string.IsNullOrEmpty(regError) ? "reg-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(regError) ? "true" : "false")"
                        @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoRegister(); })" />
             </div>
@@ -70,7 +88,7 @@
                     <div class="d-flex align-items-start gap-2">
                         <i class="bi bi-exclamation-circle-fill flex-shrink-0 mt-1"></i>
                         <div>
-                            <strong>Error en el registro</strong>
+                            <strong>@Loc["register.error.title"]</strong>
                             <p class="mb-0 mt-1">@regError</p>
                         </div>
                     </div>
@@ -85,17 +103,17 @@
                 @if (isRegisterLoading)
                 {
                     <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    <span>Creando...</span>
+                    <span>@Loc["register.creating"]</span>
                 }
                 else
                 {
-                    <i class="bi bi-person-plus me-2"></i><span>Crear cuenta</span>
+                    <i class="bi bi-person-plus me-2"></i><span>@Loc["register.title"]</span>
                 }
             </button>
 
             <p class="login-cta text-center">
-                ¿Ya tienes cuenta?
-                <button class="login-cta-link" @onclick="CloseRegister">Inicia sesión</button>
+                @Loc["register.alreadyHasAccount"]
+                <button class="login-cta-link" @onclick="CloseRegister">@Loc["register.signInLink"]</button>
             </p>
 
         </div>
@@ -107,7 +125,7 @@ else
     <div class="login-wrapper">
         <div class="login-card">
 
-            <button class="login-close-btn" @onclick="GoHome" title="Ir al inicio">
+            <button class="login-close-btn" @onclick="GoHome" title="@Loc["login.goHome"]">
                 <i class="bi bi-x-lg"></i>
             </button>
 
@@ -122,28 +140,28 @@ else
                               stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
                 </svg>
                 <h2 class="login-title">CryptoView</h2>
-                <p class="login-subtitle">Dashboard Educativo</p>
+                <p class="login-subtitle">@Loc["login.subtitle"]</p>
             </div>
 
-            <h5 class="login-heading mb-4 text-center">Iniciar sesión</h5>
+            <h5 class="login-heading mb-4 text-center">@Loc["login.title"]</h5>
 
             <div class="mb-3">
-                <label class="form-label login-label" for="login-username">Usuario</label>
+                <label class="form-label login-label" for="login-username">@Loc["login.username"]</label>
                 <input id="login-username" type="text" class="form-control login-input @(!string.IsNullOrEmpty(errorMessage) ? "input-error" : "")" @bind="username" @bind:event="oninput"
-                       placeholder="Ingresá tu usuario" @ref="usernameInput" autocomplete="username"
+                       placeholder="@Loc["login.usernamePlaceholder"]" @ref="usernameInput" autocomplete="username"
                        aria-describedby="@(!string.IsNullOrEmpty(errorMessage) ? "login-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(errorMessage) ? "true" : "false")"
                        @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoLogin(); })" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label login-label" for="login-password">Contraseña</label>
+                <label class="form-label login-label" for="login-password">@Loc["login.password"]</label>
                 <div class="login-input-group">
                     <input id="login-password" type="@(showPassword ? "text" : "password")" class="form-control login-input login-input-pwd @(!string.IsNullOrEmpty(errorMessage) ? "input-error" : "")"
-                           @bind="password" @bind:event="oninput" placeholder="Ingresá tu contraseña" autocomplete="current-password"
+                           @bind="password" @bind:event="oninput" placeholder="@Loc["login.passwordPlaceholder"]" autocomplete="current-password"
                            aria-describedby="@(!string.IsNullOrEmpty(errorMessage) ? "login-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(errorMessage) ? "true" : "false")"
                            @onkeydown="@(async (e) => { if (e.Key == "Enter") await DoLogin(); })" />
                     <button class="login-pwd-toggle" type="button" @onclick="TogglePassword" tabindex="-1"
-                            aria-label="@(showPassword ? "Ocultar contraseña" : "Ver contraseña")">
+                            aria-label="@(showPassword ? Loc["login.hidePassword"] : Loc["login.showPassword"])">
                         <i class="bi @(showPassword ? "bi-eye-slash" : "bi-eye")"></i>
                     </button>
                 </div>
@@ -156,7 +174,7 @@ else
                     <div class="d-flex align-items-start gap-2">
                         <i class="bi bi-exclamation-circle-fill flex-shrink-0 mt-1"></i>
                         <div>
-                            <strong>Error de acceso</strong>
+                            <strong>@Loc["login.error.title"]</strong>
                             <p class="mb-0 mt-1">@errorMessage</p>
                         </div>
                     </div>
@@ -168,8 +186,8 @@ else
                 @if (showForgotPassword)
                 {
                     <button id="forgot-password-btn" class="login-recovery-link login-recovery-animated" @onclick="OpenPasswordRecovery"
-                          title="Recuperar contraseña" @ref="forgotPasswordBtn">
-                        <i class="bi bi-key me-1"></i>¿Olvidaste tu contraseña?
+                          title="@Loc["login.forgotPassword"]" @ref="forgotPasswordBtn">
+                        <i class="bi bi-key me-1"></i>@Loc["login.forgotPassword"]
                     </button>
                 }
             </div>
@@ -178,17 +196,17 @@ else
                 @if (isLoading)
                 {
                     <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    <span>Ingresando...</span>
+                    <span>@Loc["login.loggingIn"]</span>
                 }
                 else
                 {
-                    <i class="bi bi-box-arrow-in-right me-2"></i><span>Ingresar</span>
+                    <i class="bi bi-box-arrow-in-right me-2"></i><span>@Loc["login.signIn"]</span>
                 }
             </button>
 
             <p class="login-cta text-center mt-4">
-                ¿Eres nuevo aquí?
-                <button class="login-cta-link" @onclick="OpenRegister">Registrarte ahora</button>
+                @Loc["login.newHere"]
+                <button class="login-cta-link" @onclick="OpenRegister">@Loc["login.registerLink"]</button>
             </p>
 
         </div>
@@ -206,18 +224,18 @@ else
 
             <div class="login-modal-header">
                 <i class="bi bi-key-fill"></i>
-                <h3 id="recovery-modal-title">Recuperar Contraseña</h3>
+                <h3 id="recovery-modal-title">@Loc["login.recovery.title"]</h3>
             </div>
 
             <div class="login-modal-body">
                 <p class="text-muted mb-4">
-                    Ingresá tu nombre de usuario y te ayudaremos a recuperar tu contraseña.
+                    @Loc["login.recovery.description"]
                 </p>
 
                 <div class="mb-3">
-                    <label class="form-label login-label" for="recovery-username">Usuario</label>
+                    <label class="form-label login-label" for="recovery-username">@Loc["login.username"]</label>
                     <input id="recovery-username" type="text" class="form-control login-input @(!string.IsNullOrEmpty(recoveryError) ? "input-error" : "")" @bind="recoveryUsername"
-                           placeholder="Tu nombre de usuario" autocomplete="username"
+                           placeholder="@Loc["login.recovery.usernamePlaceholder"]" autocomplete="username"
                            aria-describedby="@(!string.IsNullOrEmpty(recoveryError) ? "recovery-error" : null)" aria-invalid="@(!string.IsNullOrEmpty(recoveryError) ? "true" : "false")"
                            @onkeydown="@(async (e) => { if (e.Key == "Enter") await SubmitRecovery(); })" />
                 </div>
@@ -234,16 +252,16 @@ else
             </div>
 
             <div class="login-modal-footer">
-                <button class="btn btn-secondary" @onclick="ClosePasswordRecovery">Cancelar</button>
+                <button class="btn btn-secondary" @onclick="ClosePasswordRecovery">@Loc["login.recovery.cancel"]</button>
                 <button class="btn login-btn" @onclick="SubmitRecovery" disabled="@isRecoveryLoading">
                     @if (isRecoveryLoading)
                     {
                         <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Enviando...</span>
+                        <span>@Loc["login.recovery.sending"]</span>
                     }
                     else
                     {
-                        <span>Enviar enlace</span>
+                        <span>@Loc["login.recovery.sendLink"]</span>
                     }
                 </button>
             </div>
@@ -1219,6 +1237,20 @@ else
 </style>
 
 @code {
+    // ── Localización ──
+    protected override void OnInitialized()
+    {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+    }
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
+    }
+
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
     // ── Login state ──
     private string username = "";
     private string password = "";
@@ -1232,6 +1264,8 @@ else
 
     // ── Register state ──
     private bool showRegister = false;
+    private string regNombre = "";
+    private string regApellido = "";
     private string regUsername = "";
     private string regEmail = "";
     private string regPassword = "";
@@ -1251,6 +1285,9 @@ else
     {
         if (firstRender)
         {
+            // Initialize localization (reads cv_language from localStorage)
+            await Loc.InitializeAsync();
+
             await JS.InvokeVoidAsync("themeManager.applyTheme",
                 await JS.InvokeAsync<string>("themeManager.getTheme"));
 
@@ -1285,7 +1322,7 @@ else
 
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
-            errorMessage = "Completá usuario y contraseña.";
+            errorMessage = Loc["login.error.fieldsRequired"];
             return;
         }
 
@@ -1298,7 +1335,7 @@ else
 
             if (user is null)
             {
-                errorMessage = "Usuario o contraseña incorrectos.";
+                errorMessage = Loc["login.error.invalidCredentials"];
                 showForgotPassword = true;
                 isLoading = false;
                 StateHasChanged();
@@ -1333,7 +1370,7 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"[Login] Error: {ex.Message}");
-            errorMessage = "Error durante el inicio de sesión. Intentá de nuevo.";
+            errorMessage = Loc["login.error.unexpected"];
             isLoading = false;
             StateHasChanged();
         }
@@ -1348,7 +1385,7 @@ else
     private void OpenRegister()
     {
         regError = regSuccess = "";
-        regUsername = regEmail = regPassword = regConfirm = "";
+        regNombre = regApellido = regUsername = regEmail = regPassword = regConfirm = "";
         showForgotPassword = false;
         showRegister = true;
     }
@@ -1364,21 +1401,33 @@ else
     {
         regError = regSuccess = "";
 
+        if (string.IsNullOrWhiteSpace(regNombre))
+        {
+            regError = Loc["register.error.firstNameRequired"];
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(regApellido))
+        {
+            regError = Loc["register.error.lastNameRequired"];
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(regUsername) || string.IsNullOrWhiteSpace(regPassword))
         {
-            regError = "Completá al menos usuario y contraseña.";
+            regError = Loc["register.error.fieldsRequired"];
             return;
         }
 
         if (regPassword != regConfirm)
         {
-            regError = "Las contraseñas no coinciden.";
+            regError = Loc["register.error.passwordMismatch"];
             return;
         }
 
         if (regPassword.Length < 6)
         {
-            regError = "La contraseña debe tener al menos 6 caracteres.";
+            regError = Loc["register.error.passwordTooShort"];
             return;
         }
 
@@ -1387,7 +1436,9 @@ else
 
         try
         {
-            var (ok, error) = await AuthSvc.RegisterAsync(regUsername.Trim(), regPassword, regEmail);
+            var (ok, error) = await AuthSvc.RegisterAsync(
+                regUsername.Trim(), regPassword, regEmail,
+                regNombre.Trim(), regApellido.Trim());
 
             if (!ok)
             {
@@ -1397,7 +1448,7 @@ else
                 return;
             }
 
-            regSuccess = "¡Cuenta creada! Iniciando sesión...";
+            regSuccess = Loc["register.success"];
             StateHasChanged();
             await Task.Delay(900);
 
@@ -1456,7 +1507,7 @@ else
 
         if (string.IsNullOrWhiteSpace(recoveryUsername))
         {
-            recoveryError = "Ingresá tu nombre de usuario.";
+            recoveryError = Loc["login.recovery.errorUsernameRequired"];
             return;
         }
 
@@ -1465,7 +1516,7 @@ else
 
         await Task.Delay(1000); // Simulate API call
 
-        recoverySuccess = "Te hemos enviado un enlace de recuperación al email asociado. Revisa tu bandeja de entrada.";
+        recoverySuccess = Loc["login.recovery.success"];
         isRecoveryLoading = false;
         StateHasChanged();
 

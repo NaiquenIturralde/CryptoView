@@ -35,46 +35,34 @@ window.themeManager = {
 };
 
 window.sessionManager = {
-    /// Session expiry time in milliseconds (24 hours)
-    _sessionTimeout: 24 * 60 * 60 * 1000,
-
-    /// Persists the authenticated user as JSON and keeps legacy keys in sync.
-    /// Includes timestamp for session validation.
+    /// Persists the authenticated user in sessionStorage.
+    /// Session expires when the browser tab/window closes.
     setUser: function (userObj) {
         try {
-            // Ensure timestamp is set
             if (!userObj.timestamp) {
                 userObj.timestamp = Date.now();
             }
-            localStorage.setItem("currentUser", JSON.stringify(userObj));
-            localStorage.setItem("user",     userObj.username || "");
-            localStorage.setItem("userRole", userObj.role     || "");
-            localStorage.setItem("sessionCreated", userObj.timestamp.toString());
+            sessionStorage.setItem("currentUser", JSON.stringify(userObj));
+
+            // Transition cleanup: remove legacy keys from localStorage
+            try {
+                localStorage.removeItem("currentUser");
+                localStorage.removeItem("user");
+                localStorage.removeItem("userRole");
+                localStorage.removeItem("sessionCreated");
+                localStorage.removeItem("token");
+            } catch (e) { /* ignore cleanup errors */ }
         } catch (e) {
             console.warn("[sessionManager] No se pudo guardar usuario:", e);
         }
     },
 
-    /// Returns the full user object, or null if not logged in or session expired.
+    /// Returns the full user object, or null if no session exists.
     getUser: function () {
         try {
-            var json = localStorage.getItem("currentUser");
+            var json = sessionStorage.getItem("currentUser");
             if (!json) return null;
-            
-            var obj = JSON.parse(json);
-            
-            // Validate session hasn't expired
-            if (obj.timestamp) {
-                var now = Date.now();
-                var sessionAge = now - obj.timestamp;
-                if (sessionAge > this._sessionTimeout) {
-                    // Session expired
-                    this.logout();
-                    return null;
-                }
-            }
-            
-            return obj;
+            return JSON.parse(json);
         } catch (e) {
             console.warn("[sessionManager] Error parsing user:", e);
             return null;
@@ -82,35 +70,20 @@ window.sessionManager = {
     },
 
     /// Returns just the username string for easy C# interop.
-    /// Falls back to the legacy "user" key so sessions created before
-    /// this update are still recognised after a page refresh.
     getUsername: function () {
         try {
-            var json = localStorage.getItem("currentUser");
+            var json = sessionStorage.getItem("currentUser");
             if (json) {
                 var obj = JSON.parse(json);
-                if (obj.username) {
-                    // Validate session hasn't expired
-                    if (obj.timestamp) {
-                        var now = Date.now();
-                        var sessionAge = now - obj.timestamp;
-                        if (sessionAge > this._sessionTimeout) {
-                            // Session expired
-                            this.logout();
-                            return "";
-                        }
-                    }
-                    return obj.username;
-                }
+                if (obj.username) return obj.username;
             }
-            return localStorage.getItem("user") || "";
         } catch (e) {
             console.warn("[sessionManager] Error getting username:", e);
-            return localStorage.getItem("user") || "";
         }
+        return "";
     },
 
-    /// Returns whether there is a valid, non-expired session
+    /// Returns whether there is a valid session
     isSessionValid: function () {
         try {
             var user = this.getUser();
@@ -120,28 +93,29 @@ window.sessionManager = {
         }
     },
 
-    /// Checks session age and warns if close to expiry
-    getSessionAge: function () {
+    /// Returns the raw user JSON string for C# interop (used by MainLayout to restore session)
+    getUserJson: function () {
         try {
-            var created = localStorage.getItem("sessionCreated");
-            if (!created) return -1;
-            
-            var createdTime = parseInt(created, 10);
-            return Date.now() - createdTime;
+            var json = sessionStorage.getItem("currentUser");
+            if (!json) return null;
+            var obj = JSON.parse(json);
+            if (obj.id && obj.username) return json;
+            return null;
         } catch (e) {
-            return -1;
+            return null;
         }
     },
 
     /// Completely clears all session data from storage
     logout: function () {
-        console.log("Logout ejecutado - limpiando sesión");
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("currentUser");
-        localStorage.removeItem("sessionCreated");
-        sessionStorage.clear();
+        sessionStorage.removeItem("currentUser");
+        try {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            localStorage.removeItem("userRole");
+            localStorage.removeItem("sessionCreated");
+            localStorage.removeItem("currentUser");
+        } catch (e) { /* ignore cleanup errors */ }
     }
 };
 

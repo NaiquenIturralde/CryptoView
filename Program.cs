@@ -59,6 +59,15 @@ builder.Services.AddScoped<CryptoView.Services.AuthStateService>();
 // Servicio de perfil de usuario
 builder.Services.AddScoped<CryptoView.Services.ProfileService>();
 
+// Servicio central de criptomonedas favoritas por usuario
+builder.Services.AddScoped<CryptoView.Services.FavoriteCryptoService>();
+
+// Servicio de localización — Scoped = una instancia por circuito Blazor
+builder.Services.AddScoped<CryptoView.Services.LocalizacionService>();
+
+// Servicio de tutoriales contextuales — Scoped = una instancia por circuito Blazor
+builder.Services.AddScoped<CryptoView.Services.TutorialService>();
+
 // 6. Configuración de Swagger/OpenAPI para documentación de API
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -130,25 +139,34 @@ using (var scope = app.Services.CreateScope())
             END");
 
         // ── Admin seed / recovery ────────────────────────────────────────────────
+        logger.LogInformation("[AdminSeed] Admin seed running...");
+
         var adminCfg = app.Configuration.GetSection("AdminSeed");
         var adminUser = adminCfg["Username"] ?? "admin";
-        var adminPassEnv = Environment.GetEnvironmentVariable("CRYPTOVIEW_ADMIN_PASSWORD");
+
+        // Read from IConfiguration first (works on MonsterASP/IIS), fallback to OS env var
+        var adminPassEnv =
+            app.Configuration["CRYPTOVIEW_ADMIN_PASSWORD"]
+            ?? Environment.GetEnvironmentVariable("CRYPTOVIEW_ADMIN_PASSWORD");
+
+        var adminEnvDetected = !string.IsNullOrWhiteSpace(adminPassEnv);
+        logger.LogInformation("[AdminSeed] CRYPTOVIEW_ADMIN_PASSWORD exists: {Detected}", adminEnvDetected);
 
         var authService = services.GetRequiredService<CryptoView.Services.AuthService>();
 
         // Check if admin already exists in DB
         var adminExists = await context.AppUsers.AnyAsync(u => u.Role == "Admin");
 
-        if (!string.IsNullOrEmpty(adminPassEnv))
+        if (adminEnvDetected)
         {
             // Case 1: Variable is present -> Force update or create
-            logger.LogInformation("CRYPTOVIEW_ADMIN_PASSWORD detected. Updating Admin credentials...");
-            await authService.EnsureAdminAsync(adminUser, adminPassEnv, forceReset: true);
+            logger.LogInformation("[AdminSeed] Proceeding with admin password update (forceReset=true)...");
+            await authService.EnsureAdminAsync(adminUser, adminPassEnv!, forceReset: true);
         }
         else if (adminExists)
         {
             // Case 2: Variable missing, but Admin exists in DB -> Do nothing (safe)
-            logger.LogInformation("Admin user found in DB. No password update required.");
+            logger.LogInformation("[AdminSeed] Admin user found in DB. No password update required.");
         }
         else
         {
@@ -158,7 +176,7 @@ using (var scope = app.Services.CreateScope())
                 "Please set the environment variable to create the initial Admin account.");
         }
 
-        logger.LogInformation("Base de datos inicializada correctamente");
+        logger.LogInformation("[AdminSeed] Admin seed completed. Database initialized successfully.");
     }
     catch (Exception ex)
     {

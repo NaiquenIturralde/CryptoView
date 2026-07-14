@@ -26,6 +26,7 @@
     
     <!-- Custom CSS -->
     <link href="css/site.css" rel="stylesheet" asp-append-version="true" />
+    <link href="CryptoView.styles.css" rel="stylesheet" />
 
     <!-- Flatpickr date picker -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
@@ -57,6 +58,9 @@
         }
         })();
     </script>
+
+    <!-- ══ Language ══ -->
+    <script src="~/js/language.js"></script>
 </head>
 
 <body>
@@ -146,6 +150,7 @@
     <script src="js/theme.js"></script>
         <script src="~/js/cvCurrencySelect.js"></script>
         <script src="~/js/loginAccessibility.js"></script>
+        <script src="~/js/tutorial.js"></script>
     
     <!-- Custom Chart.js Functions -->
     <script>
@@ -349,7 +354,7 @@
         });
         };
 
-        window.renderBarChart = function (canvasId, labels, data) {
+        window.renderBarChart = function (canvasId, labels, data, titleText, xAxisTitle, yAxisTitle) {
         const ctx = document.getElementById(canvasId);
         if (!ctx) return;
         if (window._cvCharts[canvasId]) {
@@ -367,7 +372,7 @@
         data: {
         labels: labels,
         datasets: [{
-        label: 'Cambio 24h (%)',
+        label: yAxisTitle || 'Cambio 24h (%)',
         data: data,
         backgroundColor: colors,
         borderColor: borderColors,
@@ -384,7 +389,7 @@
         legend: { display: false },
         title: {
         display: true,
-        text: 'Variación de Precio 24h (%)',
+        text: titleText || '',
         color: CV.accent,
         font: { size: 15, family: "'Poppins','Inter',sans-serif", weight: '600' }
         },
@@ -399,10 +404,12 @@
         },
         scales: {
         x: {
+        title: { display: true, text: xAxisTitle || '', color: CV.yellow, font: { family: "'Inter',sans-serif", size: 11, weight: '600' } },
         ticks: { color: CV.tickColor(), font: { weight: '500' } },
         grid: { color: CV.gridColor() }
         },
         y: {
+        title: { display: true, text: yAxisTitle || '', color: CV.yellow, font: { family: "'Inter',sans-serif", size: 11, weight: '600' } },
         ticks: { color: CV.tickColor(), font: { weight: '500' } },
         grid: { color: CV.gridColor() },
         beginAtZero: true
@@ -411,7 +418,7 @@
         }
         });
         };
-        window.renderLineChartMulti = function (canvasId, labels, datasets, chartTitle, mode) {
+        window.renderLineChartMulti = function (canvasId, labels, datasets, chartTitle, mode, xAxisTitle, yAxisTitle) {
             var ctx = document.getElementById(canvasId);
             if (!ctx) return;
             if (window._cvCharts[canvasId]) {
@@ -649,6 +656,7 @@
                         x: {
                             offset: true,
                             bounds: 'ticks',
+                            title: { display: true, text: xAxisTitle || '', color: CV.yellow, font: { family: "'Inter',sans-serif", size: 11, weight: '600' } },
                             ticks: {
                                 color:         CV.tickColor(),
                                 font:          { family: "'Inter',sans-serif", size: 11, weight: '500' },
@@ -665,7 +673,7 @@
                             max:   _yMax + _yPad,
                             title: {
                                 display: true,
-                                text:    isPercent ? 'Rendimiento (%)' : 'Precio en USD',
+                                text:    yAxisTitle || (isPercent ? 'Rendimiento (%)' : 'Precio en USD'),
                                 color:   CV.accent,
                                 font:    { family: "'Inter',sans-serif", size: 11, weight: '600' }
                             },

@@ -3,24 +3,27 @@
 @inject IJSRuntime JSRuntime
 @inject NotificationService NotificationSvc
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.FavoriteCryptoService FavoriteCryptoSvc
+@inject CryptoView.Services.LocalizacionService Loc
 @inject NavigationManager Nav
+@implements IDisposable
 @using Microsoft.EntityFrameworkCore
 
-<PageTitle>Mis Criptomonedas - CryptoView</PageTitle>
+<PageTitle>@Loc["cryptolist.pageTitle"]</PageTitle>
 
 <div class="page-container crypto-list-container">
     <!-- Header -->
     <div class="page-header mb-4">
         <div class="page-header-top">
             <h1 class="page-main-title mb-0">
-                <i class="bi bi-list-ul"></i> Mis Criptomonedas
+                <i class="bi bi-list-ul"></i> @Loc["cryptolist.title"]
             </h1>
             <button class="btn btn-primary btn-header-add" @onclick="ShowAddModal"
-                    aria-label="Agregar Nueva Criptomoneda" title="Agregar Nueva">
-                <i class="bi bi-plus-circle"></i><span class="btn-add-text"> Agregar Nueva</span>
+                    aria-label="@Loc["cryptolist.addNewAria"]" title="@Loc["cryptolist.addNew"]">
+                <i class="bi bi-plus-circle"></i><span class="btn-add-text"> @Loc["cryptolist.addNew"]</span>
             </button>
         </div>
-        <p class="lead text-light mt-2 mb-0">Gestiona tu lista de criptomonedas favoritas</p>
+        <p class="lead text-light mt-2 mb-0">@Loc["cryptolist.subtitle"]</p>
     </div>
 
     <!-- Search and Filter -->
@@ -31,11 +34,11 @@
                     <i class="bi bi-search text-warning"></i>
                 </span>
                 <input type="text" class="form-control bg-dark text-light border-warning"
-                       placeholder="Buscar por nombre o símbolo..." @bind="searchTerm" @bind:event="oninput" />
+                       placeholder="@Loc["cryptolist.searchPlaceholder"]" @bind="searchTerm" @bind:event="oninput" />
             </div>
             <button class="btn btn-primary search-update-btn" @onclick="RefreshAllPrices" disabled="@isLoading">
                 <i class="bi bi-arrow-clockwise @(isLoading ? "spin" : "")"></i>
-                Actualizar Todos
+                @Loc["cryptolist.updateAll"]
             </button>
         </div>
     </div>
@@ -44,25 +47,25 @@
     {
         <div class="text-center py-5">
             <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Cargando...</span>
+                <span class="visually-hidden">@Loc["cryptolist.loadingHidden"]</span>
             </div>
-            <p class="mt-3 text-light">Cargando criptomonedas...</p>
+            <p class="mt-3 text-light">@Loc["cryptolist.loadingText"]</p>
         </div>
     }
     else if (!FilteredCryptos.Any())
     {
         <div class="empty-state text-center py-5">
             <i class="bi bi-inbox display-1 text-muted"></i>
-            <h3 class="mt-3 text-light">No se encontraron criptomonedas</h3>
+            <h3 class="mt-3 text-light">@Loc["cryptolist.emptyTitle"]</h3>
             <p class="text-muted">
                 @(string.IsNullOrWhiteSpace(searchTerm)
-                    ? "Comienza agregando tus criptomonedas favoritas"
-                    : "Intenta con otro término de búsqueda")
+                    ? Loc["cryptolist.emptyNoSearch"]
+                    : Loc["cryptolist.emptyWithSearch"])
             </p>
             @if (string.IsNullOrWhiteSpace(searchTerm))
             {
                 <button class="btn btn-primary mt-3" @onclick="ShowAddModal">
-                    <i class="bi bi-plus-circle"></i> Agregar Criptomoneda
+                    <i class="bi bi-plus-circle"></i> @Loc["cryptolist.addCrypto"]
                 </button>
             }
         </div>
@@ -100,1694 +103,1691 @@
                         <!-- ═══ Always visible metrics ═══ -->
                         <div class="crypto-accordion-metrics">
                             <div class="stat-row">
-                                <span class="stat-label">Market Cap</span>
+                                <span class="stat-label">@Loc["cryptolist.marketCap"]</span>
                                 <span class="data-value">$@FormatLargeNumber(crypto.MarketCap)</span>
                             </div>
                             <div class="stat-row">
-                                <span class="stat-label">Volumen 24h</span>
+                                <span class="stat-label">@Loc["cryptolist.volume24h"]</span>
                                 <span class="data-value">$@FormatLargeNumber(crypto.Volume24h)</span>
                             </div>
                             <div class="stat-row">
-                                <span class="stat-label">Notas</span>
+                                <span class="stat-label">@Loc["cryptolist.notesLabel"]</span>
                                 <span class="data-value">
                                     @if (crypto.Notes.Any())
                                     {
-                                        <span class="cv-notes-indicator">@crypto.Notes.Count nota@(crypto.Notes.Count == 1 ? "" :
-                                                              "s")</span>
-                                        }
-                                else
-                                        {
-                                            <span class="text-muted">Sin notas cargadas</span>
-                                        }
-                                    </span>
-                                </div>
-                                <div class="stat-row">
-                                    <span class="stat-label">Actualización</span>
-                                    <span class="data-value">@crypto.LastUpdated.ToString("dd/MM HH:mm")</span>
-                                </div>
-                            </div>
-
-                            <!-- ═══ Expandable actions ═══ -->
-                            <div class="crypto-accordion-body @(isExpanded ? "cv-expanded" : "cv-collapsed")">
-                                <div class="crypto-accordion-actions">
-                                    <button class="cv-mobile-btn cv-btn-notes" @onclick="() => ShowNotesModal(crypto)"
-                                            @onclick:stopPropagation>
-                                        <i class="bi bi-sticky-fill"></i>
-                                        <span>Ver Notas</span>
-                                        <span class="cv-btn-badge">@crypto.Notes.Count</span>
-                                    </button>
-                                    <button class="cv-mobile-btn cv-btn-edit" @onclick="() => ShowEditModal(crypto)"
-                                            @onclick:stopPropagation>
-                                        <i class="bi bi-pencil-fill"></i>
-                                        <span>Editar</span>
-                                    </button>
-                                    <button class="cv-mobile-btn cv-btn-delete" @onclick="() => DeleteCrypto(crypto)"
-                                            @onclick:stopPropagation>
-                                        <i class="bi bi-trash3-fill"></i>
-                                        <span>Eliminar</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </article>
-                    }
-                </div>
-                <div class="cv-mobile-footer">
-                    <i class="bi bi-broadcast"></i> Datos actualizados en tiempo real
-                </div>
-            </div>
-        }
-    </div>
-
-    <!--Modal for Add / Edit Cryptocurrency-->
-    @if (showModal)
-    {
-        <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.8);">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content bg-dark border-warning">
-                    <div class="modal-header border-warning">
-                        <h5 class="modal-title text-warning">
-                            <i class="bi bi-@(isEditMode ? "pencil" : "plus-circle")"></i>
-                            @(isEditMode ? "Editar Criptomoneda" : "Agregar Nueva Criptomoneda")
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <EditForm Model="currentCrypto" OnValidSubmit="SaveCrypto">
-                            <DataAnnotationsValidator />
-
-                            <div class="mb-3">
-                                <label class="form-label text-light"> ID de Coinlore / Nombre</label>
-                                <div class="input-group">
-                                    <InputText class="form-control bg-dark text-light border-warning" @bind-Value="searchQuery"
-                                               placeholder="ej: bitcoin, ethereum, dogecoin" disabled="@isEditMode"
-                                               @onkeydown="OnSearchInputKeyDown" />
-                                    @if (!isEditMode)
-                                    {
-                                        <button type="button" class="btn btn-outline-info" @onclick="SearchCoins"
-                                                disabled="@isSearching">
-                                            <i class="bi bi-search @(isSearching ? "spin" : "")"></i>
-                                            @(isSearching ? "Buscando..." : "Buscar")
-                                        </button>
+                                        <span class="cv-notes-indicator">@NotesLabel(crypto.Notes.Count)</span>
                                     }
-                                </div>
-                                <small class="text-muted"> Escribe el nombre de una criptomoneda y presiona Enter o haz clic en
-                                    Buscar</small>
-                                    <ValidationMessage For="@(() => currentCrypto.CoinId)" class="text-danger" />
-
-                                    @if (searchResults.Any())
+                                    else
                                     {
-                                        <div class="search-results-dropdown mt-2">
-                                            <div class="search-results-header">
-                                                <i class="bi bi-list-ul"></i>
-                                                @searchResults.Count resultado@(searchResults.Count == 1 ? "" : "s") — usa ↑↓ para
-                                                navegar, Enter para confirmar
-                                            </div>
-                                            @{
-                                                int _idx = 0;
-                                            }
-                                            @foreach (var result in searchResults)
-                                            {
-                                                var _i = _idx++;
-                                                var _r = result;
-                                                var isSelected = _i == selectedResultIndex;
-                                                <div class="search-result-item @(isSelected ? "search-result-selected" : "")" role="option"
-                                                     aria-selected="@isSelected.ToString().ToLower()" tabindex="-1"
-                                                     @onclick="() => SelectCoin(_r)">
-                                                    <div class="d-flex justify-content-between align-items-center">
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            @if (isSelected)
-                                                            {
-                                                                <i class="bi bi-chevron-right search-result-caret"></i>
-                                                            }
-                                                            <div>
-                                                                <strong class="search-result-name"> @_r.Name </strong>
-                                                                <span class="search-result-symbol"> @_r.Symbol.ToUpper() </span>
-                                                            </div>
-                                                        </div>
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <span class="search-result-id"> @_r.Id </span>
-                                                            @if (isSelected)
-                                                            {
-                                                                <span class="search-result-enter-hint">↵</span>
-                                                            }
-                                                        </div>
+                                        <span class="text-muted">@Loc["cryptolist.noNotes"]</span>
+                                    }
+                                </span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">@Loc["cryptolist.lastUpdate"]</span>
+                                <span class="data-value">@crypto.LastUpdated.ToString("dd/MM HH:mm")</span>
+                            </div>
+                        </div>
+
+                        <!-- ═══ Expandable actions ═══ -->
+                        <div class="crypto-accordion-body @(isExpanded ? "cv-expanded" : "cv-collapsed")">
+                            <div class="crypto-accordion-actions">
+                                <button class="cv-mobile-btn cv-btn-notes" @onclick="() => ShowNotesModal(crypto)"
+                                        @onclick:stopPropagation>
+                                    <i class="bi bi-sticky-fill"></i>
+                                    <span>@Loc["cryptolist.viewNotes"]</span>
+                                    <span class="cv-btn-badge">@crypto.Notes.Count</span>
+                                </button>
+                                <button class="cv-mobile-btn cv-btn-edit" @onclick="() => ShowEditModal(crypto)"
+                                        @onclick:stopPropagation>
+                                    <i class="bi bi-pencil-fill"></i>
+                                    <span>@Loc["cryptolist.edit"]</span>
+                                </button>
+                                <button class="cv-mobile-btn cv-btn-delete" @onclick="() => DeleteCrypto(crypto)"
+                                        @onclick:stopPropagation>
+                                    <i class="bi bi-trash3-fill"></i>
+                                    <span>@Loc["cryptolist.delete"]</span>
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </div>
+            <div class="cv-mobile-footer">
+                <i class="bi bi-broadcast"></i> @Loc["cryptolist.realtimeData"]
+            </div>
+        </div>
+    }
+</div>
+
+<!--Modal for Add / Edit Cryptocurrency-->
+@if (showModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.8);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark border-warning crypto-modal">
+                <div class="modal-header border-warning">
+                    <h5 class="modal-title text-warning">
+                        <i class="bi bi-@(isEditMode ? "pencil" : "plus-circle")"></i>
+                        @(isEditMode ? Loc["cryptolist.editTitle"] : Loc["cryptolist.addTitle"])
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="currentCrypto" OnValidSubmit="SaveCrypto">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label crypto-modal-label"> @Loc["cryptolist.coinIdLabel"]</label>
+                            <div class="input-group">
+                                <InputText class="form-control bg-dark text-light border-warning" @bind-Value="searchQuery"
+                                           placeholder="@Loc["cryptolist.coinIdPlaceholder"]" disabled="@isEditMode"
+                                           @onkeydown="OnSearchInputKeyDown" />
+                                @if (!isEditMode)
+                                {
+                                    <button type="button" class="btn btn-outline-info" @onclick="SearchCoins"
+                                            disabled="@isSearching">
+                                        <i class="bi bi-search @(isSearching ? "spin" : "")"></i>
+                                        @(isSearching ? Loc["cryptolist.searching"] : Loc["cryptolist.searchButton"])
+                                    </button>
+                                }
+                            </div>
+                            <small class="crypto-modal-hint"> @Loc["cryptolist.coinIdHint"]</small>
+                            <ValidationMessage For="@(() => currentCrypto.CoinId)" class="text-danger" />
+
+                            @if (searchResults.Any())
+                            {
+                                <div class="search-results-dropdown mt-2">
+                                    <div class="search-results-header">
+                                        <i class="bi bi-list-ul"></i>
+                                        @(searchResults.Count == 1 ? Loc.Format("cryptolist.searchResultCountSingular",
+                        searchResults.Count) : Loc.Format("cryptolist.searchResultCountPlural",
+                        searchResults.Count))
+                                    </div>
+                                    @{
+                                        int _idx = 0;
+                                    }
+                                    @foreach (var result in searchResults)
+                                    {
+                                        var _i = _idx++;
+                                        var _r = result;
+                                        var isSelected = _i == selectedResultIndex;
+                                        <div class="search-result-item @(isSelected ? "search-result-selected" : "")" role="option"
+                                             aria-selected="@isSelected.ToString().ToLower()" tabindex="-1"
+                                             @onclick="() => SelectCoin(_r)">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    @if (isSelected)
+                                                    {
+                                                        <i class="bi bi-chevron-right search-result-caret"></i>
+                                                    }
+                                                    <div>
+                                                        <strong class="search-result-name"> @_r.Name </strong>
+                                                        <span class="search-result-symbol"> @_r.Symbol.ToUpper() </span>
                                                     </div>
                                                 </div>
-                                            }
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="search-result-id"> @_r.Id </span>
+                                                    @if (isSelected)
+                                                    {
+                                                        <span class="search-result-enter-hint">↵</span>
+                                                    }
+                                                </div>
+                                            </div>
                                         </div>
                                     }
-
-                                    @if (searchResults.Count == 0 && searchAttempted && !isSearching)
-                                    {
-                                        <div class="alert alert-warning mt-2 mb-0">
-                                            <i class="bi bi-exclamation-triangle"></i> No se encontraron resultados.Intenta con otro
-                                            término.
-                                        </div>
-                                    }
                                 </div>
+                            }
 
-                                <div class="mb-3">
-                                    <label class="form-label text-light"> ID de Coinlore(auto-completado)</label>
-                                    <InputText class="form-control bg-dark text-light border-success"
-                                               @bind-Value="currentCrypto.CoinId" placeholder="Se completará automáticamente"
-                                               readonly="@(!isEditMode)" />
-                                    <ValidationMessage For="@(() => currentCrypto.CoinId)" class="text-danger" />
+                            @if (searchResults.Count == 0 && searchAttempted && !isSearching)
+                            {
+                                <div class="alert alert-warning mt-2 mb-0">
+                                    <i class="bi bi-exclamation-triangle"></i> @Loc["cryptolist.noResults"]
                                 </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label text-light"> Nombre </label>
-                                    <InputText class="form-control bg-dark text-light border-warning"
-                                               @bind-Value="currentCrypto.Name" placeholder="Bitcoin" />
-                                    <ValidationMessage For="@(() => currentCrypto.Name)" class="text-danger" />
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label text-light"> Símbolo </label>
-                                    <InputText class="form-control bg-dark text-light border-warning"
-                                               @bind-Value="currentCrypto.Symbol" placeholder="BTC" />
-                                    <ValidationMessage For="@(() => currentCrypto.Symbol)" class="text-danger" />
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label text-light"> Umbral de Precio(opcional)</label>
-                                    <InputNumber class="form-control bg-dark text-light border-warning"
-                                                 @bind-Value="currentCrypto.PriceThreshold" placeholder="50000" />
-                                    <small class="text-muted"> Recibirás notificaciones cuando se alcance este precio</small>
-                                </div>
-
-                                @if (modalError != null)
-                                {
-                                    <div class="alert alert-danger">
-                                        <i class="bi bi-exclamation-triangle"></i> @modalError
-                                    </div>
-                                }
-
-                                <div class="d-flex justify-content-end gap-2">
-                                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">
-                                        <i class="bi bi-x-circle"></i> Cancelar
-                                    </button>
-                                    <button type="submit" class="btn btn-success" disabled="@isLoading">
-                                        <i class="bi bi-@(isLoading ? "hourglass-split" : "check-circle")"></i>
-                                        @(isLoading ? "Guardando..." : "Guardar")
-                                    </button>
-                                </div>
-                            </EditForm>
+                            }
                         </div>
-                    </div>
-                </div>
-            </div>
-        }
 
-        <!-- ── Modal de Notas (centered overlay) ── -->
-        @if (showNotesModal && selectedCrypto != null)
-        {
-            <!-- Overlay -->
-            <div class="cv-notes-overlay" @onclick="CloseNotesModal"></div>
-
-            <!--Modal panel-->
-            <div class="cv-notes-modal" role="dialog" aria-modal="true">
-                <!--Header-->
-                <div class="cv-notes-modal-header">
-                    <div class="cv-notes-modal-title">
-                        <span class="cv-notes-coin-badge"> @selectedCrypto.Symbol.ToUpper() </span>
-                        <span> Notas — <strong> @selectedCrypto.Name </strong></span>
-                    </div>
-                    <button class="cv-notes-close-btn" @onclick="CloseNotesModal" title="Cerrar">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-
-                <!--Scrollable body-->
-                <div class="cv-notes-modal-body">
-
-                    <!-- ── Agregar nota ── -->
-                    <div class="cv-note-form-card">
-                        <div class="cv-note-form-title">
-                            <i class="bi bi-plus-circle-fill"></i> Nueva nota
+                        <div class="mb-3">
+                            <label class="form-label crypto-modal-label"> @Loc["cryptolist.coinIdAutoLabel"]</label>
+                            <InputText class="form-control bg-dark text-light border-success"
+                                       @bind-Value="currentCrypto.CoinId" placeholder="@Loc["cryptolist.autoCompletedPlaceholder"]"
+                                       readonly="@(!isEditMode)" />
+                            <ValidationMessage For="@(() => currentCrypto.CoinId)" class="text-danger" />
                         </div>
-                        @if (!string.IsNullOrEmpty(noteValidationError))
+
+                        <div class="mb-3">
+                            <label class="form-label crypto-modal-label"> @Loc["cryptolist.nameLabel"] </label>
+                            <InputText class="form-control bg-dark text-light border-warning"
+                                       @bind-Value="currentCrypto.Name" placeholder="Bitcoin" />
+                            <ValidationMessage For="@(() => currentCrypto.Name)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label crypto-modal-label"> @Loc["cryptolist.symbolLabel"] </label>
+                            <InputText class="form-control bg-dark text-light border-warning"
+                                       @bind-Value="currentCrypto.Symbol" placeholder="BTC" />
+                            <ValidationMessage For="@(() => currentCrypto.Symbol)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label crypto-modal-label"> @Loc["cryptolist.priceThresholdLabel"]</label>
+                            <InputNumber class="form-control bg-dark text-light border-warning"
+                                         @bind-Value="currentCrypto.PriceThreshold" placeholder="50000" />
+                            <small class="crypto-modal-hint"> @Loc["cryptolist.priceThresholdHint"]</small>
+                        </div>
+
+                        @if (modalError != null)
                         {
-                            <div class="cv-note-validation-error">
-                                <i class="bi bi-exclamation-circle me-1"></i> @noteValidationError
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle"></i> @modalError
                             </div>
                         }
-                        <div class="mb-2">
-                            <input type="text" class="cv-note-input" placeholder="Título de la nota" @bind="newNote.Title"
-                                   @bind:event="oninput" maxlength="120" />
-                        </div>
-                        <div class="mb-2">
-                            <textarea class="cv-note-input cv-note-textarea" placeholder="Contenido de la nota..." rows="3"
-                                      @bind="newNote.Content" @bind:event="oninput" maxlength="1000"></textarea>
-                        </div>
-                        <div class="cv-note-form-footer">
-                            <div class="cv-priority-group">
-                                <button type="button" class="cv-priority-btn @(newNote.Priority == 1 ? "active-low" : "")"
-                                        @onclick='() => newNote.Priority = 1'>🟢 Baja </button>
-                                <button type="button" class="cv-priority-btn @(newNote.Priority == 2 ? "active-mid" : "")"
-                                        @onclick='() => newNote.Priority = 2'>🟡 Media </button>
-                                <button type="button" class="cv-priority-btn @(newNote.Priority == 3 ? "active-high" : "")"
-                                        @onclick='() => newNote.Priority = 3'>🔴 Alta </button>
-                            </div>
-                            <button class="cv-note-add-btn" @onclick="AddNoteWithValidation">
-                                <i class="bi bi-check-circle-fill me-1"></i> Agregar nota
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseModal">
+                                <i class="bi bi-x-circle"></i> @Loc["cryptolist.cancel"]
+                            </button>
+                            <button type="submit" class="btn btn-success" disabled="@isLoading">
+                                <i class="bi bi-@(isLoading ? "hourglass-split" : "check-circle")"></i>
+                                @(isLoading ? Loc["cryptolist.saving"] : Loc["cryptolist.save"])
                             </button>
                         </div>
-                    </div>
-
-                    <!-- ── Lista de notas ── -->
-                    @if (selectedCrypto.Notes.Any())
-                    {
-                        <div class="cv-notes-count-label">
-                            <i class="bi bi-sticky me-1"></i> @selectedCrypto.Notes.Count nota@(selectedCrypto.Notes.Count == 1 ? "" :
-                                                                                                                                        "s")
-                        </div>
-                        @foreach (var note in selectedCrypto.Notes.OrderByDescending(n => n.CreatedAt))
-                        {
-                            <div class="cv-note-card cv-note-priority-@note.Priority">
-                                <div class="cv-note-card-header">
-                                    <span class="cv-note-card-title">
-                                        @GetPriorityIcon(note.Priority) @note.Title
-                                    </span>
-                                    <button class="cv-note-delete-btn" @onclick="() => DeleteNote(note)" title="Eliminar nota">
-                                        <i class="bi bi-trash3"></i>
-                                    </button>
-                                </div>
-                                <p class="cv-note-card-content"> @note.Content </p>
-                                <div class="cv-note-card-meta">
-                                    <i class="bi bi-clock me-1"></i> @note.CreatedAt.ToString("dd/MM/yyyy HH:mm")
-                                </div>
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        <div class="cv-notes-empty">
-                            <i class="bi bi-journal-text"></i>
-                            <p> Todavía no hay notas para <strong>@selectedCrypto.Name</strong></p>
-                            <small>Usá el formulario de arriba para agregar una.</small>
-                        </div>
-                    }
+                    </EditForm>
                 </div>
             </div>
+        </div>
+    </div>
+}
+
+<!-- ── Modal de Notas (centered overlay) ── -->
+@if (showNotesModal && selectedCrypto != null)
+{
+    <!-- Overlay -->
+    <div class="cv-notes-overlay" @onclick="CloseNotesModal"></div>
+
+    <!--Modal panel-->
+    <div class="cv-notes-modal" role="dialog" aria-modal="true">
+        <!--Header-->
+        <div class="cv-notes-modal-header">
+            <div class="cv-notes-modal-title">
+                <span class="cv-notes-coin-badge"> @selectedCrypto.Symbol.ToUpper() </span>
+                <span> @Loc.Format("cryptolist.notesTitle", selectedCrypto.Name) </span>
+            </div>
+            <button class="cv-notes-close-btn" @onclick="CloseNotesModal" title="@Loc["cryptolist.closeButton"]">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <!--Scrollable body-->
+        <div class="cv-notes-modal-body">
+
+            <!-- ── Agregar nota ── -->
+            <div class="cv-note-form-card">
+                <div class="cv-note-form-title">
+                    <i class="bi bi-plus-circle-fill"></i> @Loc["cryptolist.newNoteTitle"]
+                </div>
+                @if (!string.IsNullOrEmpty(noteValidationError))
+                {
+                    <div class="cv-note-validation-error">
+                        <i class="bi bi-exclamation-circle me-1"></i> @noteValidationError
+                    </div>
+                }
+                <div class="mb-2">
+                    <input type="text" class="cv-note-input" placeholder="@Loc["cryptolist.noteTitlePlaceholder"]"
+                           @bind="newNote.Title" @bind:event="oninput" maxlength="120" />
+                </div>
+                <div class="mb-2">
+                    <textarea class="cv-note-input cv-note-textarea" placeholder="@Loc["cryptolist.noteContentPlaceholder"]"
+                              rows="3" @bind="newNote.Content" @bind:event="oninput" maxlength="1000"></textarea>
+                </div>
+                <div class="cv-note-form-footer">
+                    <div class="cv-priority-group">
+                        <button type="button" class="cv-priority-btn @(newNote.Priority == 1 ? "active-low" : "")"
+                                @onclick='() => newNote.Priority = 1'>🟢 @Loc["cryptolist.priorityLow"] </button>
+                        <button type="button" class="cv-priority-btn @(newNote.Priority == 2 ? "active-mid" : "")"
+                                @onclick='() => newNote.Priority = 2'>🟡 @Loc["cryptolist.priorityMedium"] </button>
+                        <button type="button" class="cv-priority-btn @(newNote.Priority == 3 ? "active-high" : "")"
+                                @onclick='() => newNote.Priority = 3'>🔴 @Loc["cryptolist.priorityHigh"] </button>
+                    </div>
+                    <button class="cv-note-add-btn" @onclick="AddNoteWithValidation">
+                        <i class="bi bi-check-circle-fill me-1"></i> @Loc["cryptolist.addNote"]
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Lista de notas ── -->
+            @if (selectedCrypto.Notes.Any())
+            {
+                <div class="cv-notes-count-label">
+                    <i class="bi bi-sticky me-1"></i> @NotesLabel(selectedCrypto.Notes.Count)
+                </div>
+                @foreach (var note in selectedCrypto.Notes.OrderByDescending(n => n.CreatedAt))
+                {
+                    <div class="cv-note-card cv-note-priority-@note.Priority">
+                        <div class="cv-note-card-header">
+                            <span class="cv-note-card-title">
+                                @GetPriorityIcon(note.Priority) @note.Title
+                            </span>
+                            <button class="cv-note-delete-btn" @onclick="() => DeleteNote(note)" title="@Loc["cryptolist.delete"]">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                        <p class="cv-note-card-content"> @note.Content </p>
+                        <div class="cv-note-card-meta">
+                            <i class="bi bi-clock me-1"></i> @note.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="cv-notes-empty">
+                    <i class="bi bi-journal-text"></i>
+                    <p> @Loc.Format("cryptolist.emptyNotes", selectedCrypto.Name)</p>
+                    <small>@Loc["cryptolist.emptyNotesHint"]</small>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<style>
+    /* ═══════════════════════════════════════════════════════════
+                                                                           CryptoList — Navy SaaS table design
+                                                                           Tokens: orange accent · blue data · teal secondary
+                                                                        ═══════════════════════════════════════════════════════════ */
+
+    /* ── Design tokens (scoped) ── */
+    :root {
+        --cv-table-container-bg: var(--bg-card, #0F172A);
+        --cv-table-header-bg: var(--bg-surface, #111827);
+        --cv-table-row-bg: var(--bg-card, #0F172A);
+        --cv-table-row-alt-bg: var(--bg-surface, #111827);
+        --cv-table-row-hover-bg: var(--accent-soft, #1E293B);
+        --cv-table-border: var(--border-soft, rgba(255, 255, 255, 0.06));
+        --cv-table-separator: var(--border-soft, rgba(255, 255, 255, 0.05));
+        --cv-blue-accent: #22C55E;
+        --cv-cyan: var(--text-secondary, #E2E8F0);
+    }
+
+    /* ── Table wrapper card ── */
+    .cv-table-card {
+        background: var(--cv-table-container-bg);
+        border: 1px solid var(--cv-table-border);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45),
+            0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    }
+
+    /* ── Table base ── */
+    .crypto-table {
+        width: 100%;
+        margin-bottom: 0;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    /* ── Neutralize Bootstrap 5 cell background ──
+                                                                           Bootstrap .table paints every td/th via --bs-table-bg (fallback #fff).
+                                                                           Setting transparent here lets the tr-level row colors show through. */
+    .crypto-table> :not(caption)>*>* {
+        --bs-table-bg: transparent;
+        --bs-table-accent-bg: transparent;
+        background-color: transparent;
+        box-shadow: none;
+    }
+
+    /* ── Header ── */
+    .crypto-table thead tr {
+        background: var(--cv-table-header-bg);
+        border-bottom: 1px solid var(--cv-table-border);
+    }
+
+    .crypto-table thead th {
+        padding: 1rem 1.25rem;
+        font-size: var(--cv-font-size-label, 0.8125rem);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text-secondary);
+        border: none;
+        white-space: nowrap;
+    }
+
+    /* ── Body rows ── */
+    .crypto-table tbody tr {
+        background: var(--cv-table-row-bg);
+        border-bottom: 1px solid var(--cv-table-separator);
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+        position: relative;
+    }
+
+    .crypto-table tbody tr:nth-child(even) {
+        background: var(--cv-table-row-alt-bg);
+    }
+
+    .crypto-table tbody tr:last-child {
+        border-bottom: none;
+    }
+
+    /* Hover: slate highlight + left orange accent bar */
+    .crypto-table tbody tr:hover {
+        background: var(--cv-table-row-hover-bg);
+        box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.85);
+    }
+
+    .crypto-table tbody td {
+        padding: 1rem 1.25rem;
+        border: none;
+        vertical-align: middle;
+        font-size: var(--cv-font-size-body, 0.9375rem);
+        color: var(--text-primary);
+    }
+
+    /* ── Symbol badge ── */
+    .crypto-symbol {
+        width: 42px;
+        height: 42px;
+        background: linear-gradient(135deg, rgba(255, 122, 0, 0.85) 0%, rgba(224, 101, 0, 0.85) 100%);
+        border: 1px solid rgba(255, 122, 0, 0.35);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.72rem;
+        color: #fff;
+        letter-spacing: 0.02em;
+        flex-shrink: 0;
+    }
+
+    /* ── Crypto name + id ── */
+    .crypto-name {
+        font-weight: 600;
+        color: var(--cv-accent, #F59E0B);
+        font-size: 0.9375rem;
+        line-height: 1.25;
+    }
+
+    .crypto-id {
+        font-size: 0.78rem;
+        color: #94A3B8;
+        margin-top: 1px;
+    }
+
+    /* ── Price ── */
+    .price-value {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--cv-blue-accent);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Change badge ── */
+    .change-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+    }
+
+    .change-badge.positive {
+        background: rgba(34, 197, 94, 0.12);
+        color: var(--state-success, #22C55E);
+    }
+
+    .change-badge.negative {
+        background: rgba(239, 68, 68, 0.12);
+        color: var(--state-error, #EF4444);
+    }
+
+    /* ── Market cap / volume ── */
+    .data-value {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-variant-numeric: tabular-nums;
+        font-size: 0.9rem;
+    }
+
+    /* ── Action buttons (scoped to table card) ── */
+    .cv-table-card .btn-sm {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.82rem;
+        transition: all 0.18s ease;
+        min-width: 32px;
+    }
+
+    .cv-table-card .btn-outline-warning {
+        border-color: rgba(245, 158, 11, 0.55);
+        color: #F59E0B;
+    }
+
+    .cv-table-card .btn-outline-warning:hover {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: #F59E0B;
+        color: #FBBF24;
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+    }
+
+    .cv-table-card .btn-outline-info {
+        border-color: rgba(34, 197, 94, 0.5);
+        color: #22C55E;
+    }
+
+    .cv-table-card .btn-outline-info:hover {
+        background: rgba(34, 197, 94, 0.10);
+        border-color: #22C55E;
+        color: #4ADE80;
+        box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
+    }
+
+    .cv-table-card .btn-outline-primary {
+        border-color: rgba(99, 102, 241, 0.5);
+        color: #818CF8;
+    }
+
+    .cv-table-card .btn-outline-primary:hover {
+        background: rgba(99, 102, 241, 0.10);
+        border-color: #818CF8;
+        color: #A5B4FC;
+        box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .cv-table-card .btn-outline-danger {
+        border-color: rgba(239, 68, 68, 0.5);
+        color: #F87171;
+    }
+
+    .cv-table-card .btn-outline-danger:hover {
+        background: rgba(239, 68, 68, 0.10);
+        border-color: #EF4444;
+        color: #FCA5A5;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+    }
+
+    /* ── Footer bar ── */
+    .cv-table-footer {
+        background: var(--cv-table-header-bg);
+        border-top: 1px solid var(--cv-table-border);
+        padding: 0.6rem 1.1rem;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        opacity: 1;
+    }
+
+    .crypto-cards-grid {
+        display: grid;
+        gap: 1rem;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        align-items: stretch;
+        grid-template-columns: 1fr;
+    }
+
+    .crypto-cards-grid>* {
+        min-width: 0;
+    }
+
+    /* ═══ Accordion Card ═══ */
+    .crypto-accordion-card.chart-card,
+    .crypto-accordion-card {
+        position: relative;
+        margin-bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        padding: 0 !important;
+        overflow: hidden;
+        cursor: default;
+        border: 1px solid rgba(235, 118, 18, 0.35);
+        border-radius: 14px;
+        box-shadow:
+            0 0 12px rgba(235, 118, 18, 0.20),
+            0 4px 20px rgba(0, 0, 0, 0.35);
+        transition: box-shadow 0.28s ease, border-color 0.28s ease;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+        height: auto;
+        min-height: unset;
+    }
+
+    .crypto-accordion-card:hover {
+        background: inherit;
+        border-color: var(--hover-card-border);
+        box-shadow: var(--hover-card-shadow);
+        transform: var(--hover-card-transform);
+    }
+
+    .crypto-accordion-card.expanded {
+        border-color: rgba(235, 118, 18, 0.55);
+        box-shadow:
+            0 0 18px rgba(235, 118, 18, 0.32),
+            0 6px 28px rgba(0, 0, 0, 0.42);
+    }
+
+    /* ═══ Clickable Header ═══ */
+    .crypto-accordion-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem !important;
+        min-height: unset !important;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.2s ease;
+        flex-wrap: nowrap;
+    }
+
+    .crypto-accordion-header:hover {
+        background: transparent;
+    }
+
+    .crypto-accordion-header:focus-visible {
+        outline: 2px solid rgba(235, 118, 18, 0.55);
+        outline-offset: -2px;
+        border-radius: 15px;
+    }
+
+    .crypto-accordion-header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .crypto-accordion-title {
+        min-width: 0;
+    }
+
+    .crypto-accordion-title h3 {
+        font-size: 1rem;
+        font-weight: 700;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.35;
+    }
+
+    .crypto-accordion-title p {
+        font-size: 0.75rem;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .crypto-accordion-header-right {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-shrink: 0;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    .crypto-accordion-header-right .price-value {
+        font-size: 0.95rem;
+        white-space: nowrap;
+    }
+
+    .crypto-accordion-header-right .kpi-change-badge {
+        font-size: 0.78rem;
+        padding: 0.2rem 0.55rem;
+        white-space: nowrap;
+    }
+
+    /* ═══ Chevron ═══ */
+    /* ═══ Chevron: inline in header-right ═══ */
+    .crypto-accordion-chevron {
+        pointer-events: none;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        color: #EB7612 !important;
+        font-size: 1rem;
+        transition: transform 0.25s ease;
+        flex-shrink: 0;
+    }
+
+    .crypto-accordion-card.expanded .crypto-accordion-chevron {
+        transform: rotate(180deg);
+    }
+
+    .crypto-accordion-card.expanded .crypto-accordion-chevron {
+        transform: rotate(180deg);
+    }
+
+    /* ═══ Always visible metrics — 2×2 grid ═══ */
+    .crypto-accordion-metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.4rem 1rem;
+        padding: 0.5rem 1rem 0.5rem !important;
+        border-top: 1px solid rgba(235, 118, 18, 0.14);
+    }
+
+    .crypto-accordion-metrics .stat-row {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 0.82rem;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.05rem;
+        border-bottom: none;
+        min-height: 0;
+    }
+
+    .crypto-accordion-metrics .stat-label {
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .crypto-accordion-metrics .data-value {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .cv-notes-indicator {
+        color: var(--state-success, #22C55E);
+        font-weight: 600;
+        font-size: 0.82rem;
+    }
+
+    /* ═══ Expandable body ═══ */
+    .crypto-accordion-body {
+        max-height: 0;
+        min-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        padding: 0 0.85rem;
+        transition:
+            max-height 0.28s ease,
+            opacity 0.22s ease,
+            padding 0.22s ease;
+    }
+
+    .crypto-accordion-body.cv-expanded {
+        max-height: 120px;
+        min-height: auto;
+        opacity: 1;
+        padding: 0.45rem 0.85rem 0.55rem;
+    }
+
+    .crypto-accordion-body.cv-collapsed {
+        max-height: 0;
+        min-height: 0;
+        opacity: 0;
+        padding: 0 0.85rem;
+    }
+
+    /* ═══ Action buttons grid ═══ */
+    .crypto-accordion-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.35rem;
+        padding-top: 0.4rem;
+        border-top: 1px solid rgba(235, 118, 18, 0.18);
+    }
+
+    .crypto-accordion-actions .cv-mobile-btn {
+        min-width: 0;
+    }
+
+    /* ═══ Responsive breakpoints ═══ */
+
+    /* Desktop: CSS Grid con columnas anchas (mín 440px) */
+    @@media (min-width: 1026px) {
+        .crypto-cards-grid {
+            grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
         }
 
-        <style>
-            /* ═══════════════════════════════════════════════════════════
-                                   CryptoList — Navy SaaS table design
-                                   Tokens: orange accent · blue data · teal secondary
-                                ═══════════════════════════════════════════════════════════ */
-
-            /* ── Design tokens (scoped) ── */
-            :root {
-                --cv-table-container-bg: var(--bg-card, #0F172A);
-                --cv-table-header-bg: var(--bg-surface, #111827);
-                --cv-table-row-bg: var(--bg-card, #0F172A);
-                --cv-table-row-alt-bg: var(--bg-surface, #111827);
-                --cv-table-row-hover-bg: var(--accent-soft, #1E293B);
-                --cv-table-border: var(--border-soft, rgba(255, 255, 255, 0.06));
-                --cv-table-separator: var(--border-soft, rgba(255, 255, 255, 0.05));
-                --cv-blue-accent: #22C55E;
-                --cv-cyan: var(--text-secondary, #E2E8F0);
-            }
-
-            /* ── Table wrapper card ── */
-            .cv-table-card {
-                background: var(--cv-table-container-bg);
-                border: 1px solid var(--cv-table-border);
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45),
-                    0 1px 0 rgba(255, 255, 255, 0.04) inset;
-            }
-
-            /* ── Table base ── */
-            .crypto-table {
-                width: 100%;
-                margin-bottom: 0;
-                border-collapse: separate;
-                border-spacing: 0;
-            }
-
-            /* ── Neutralize Bootstrap 5 cell background ──
-                                   Bootstrap .table paints every td/th via --bs-table-bg (fallback #fff).
-                                   Setting transparent here lets the tr-level row colors show through. */
-            .crypto-table> :not(caption)>*>* {
-                --bs-table-bg: transparent;
-                --bs-table-accent-bg: transparent;
-                background-color: transparent;
-                box-shadow: none;
-            }
-
-            /* ── Header ── */
-            .crypto-table thead tr {
-                background: var(--cv-table-header-bg);
-                border-bottom: 1px solid var(--cv-table-border);
-            }
-
-            .crypto-table thead th {
-                padding: 1rem 1.25rem;
-                font-size: var(--cv-font-size-label, 0.8125rem);
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.07em;
-                color: var(--text-secondary);
-                border: none;
-                white-space: nowrap;
-            }
-
-            /* ── Body rows ── */
-            .crypto-table tbody tr {
-                background: var(--cv-table-row-bg);
-                border-bottom: 1px solid var(--cv-table-separator);
-                transition: background 0.2s ease, box-shadow 0.2s ease;
-                position: relative;
-            }
-
-            .crypto-table tbody tr:nth-child(even) {
-                background: var(--cv-table-row-alt-bg);
-            }
-
-            .crypto-table tbody tr:last-child {
-                border-bottom: none;
-            }
-
-            /* Hover: slate highlight + left orange accent bar */
-            .crypto-table tbody tr:hover {
-                background: var(--cv-table-row-hover-bg);
-                box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.85);
-            }
-
-            .crypto-table tbody td {
-                padding: 1rem 1.25rem;
-                border: none;
-                vertical-align: middle;
-                font-size: var(--cv-font-size-body, 0.9375rem);
-                color: var(--text-primary);
-            }
-
-            /* ── Symbol badge ── */
-            .crypto-symbol {
-                width: 42px;
-                height: 42px;
-                background: linear-gradient(135deg, rgba(255, 122, 0, 0.85) 0%, rgba(224, 101, 0, 0.85) 100%);
-                border: 1px solid rgba(255, 122, 0, 0.35);
-                border-radius: 10px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: 700;
-                font-size: 0.72rem;
-                color: #fff;
-                letter-spacing: 0.02em;
-                flex-shrink: 0;
-            }
-
-            /* ── Crypto name + id ── */
-            .crypto-name {
-                font-weight: 600;
-                color: var(--cv-accent, #F59E0B);
-                font-size: 0.9375rem;
-                line-height: 1.25;
-            }
-
-            .crypto-id {
-                font-size: 0.78rem;
-                color: #94A3B8;
-                margin-top: 1px;
-            }
-
-            /* ── Price ── */
-            .price-value {
-                font-weight: 700;
-                font-size: 1rem;
-                color: var(--cv-blue-accent);
-                font-variant-numeric: tabular-nums;
-            }
-
-            /* ── Change badge ── */
-            .change-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                padding: 6px 10px;
-                border-radius: 8px;
-                font-weight: 700;
-                font-size: 0.82rem;
-                font-variant-numeric: tabular-nums;
-                letter-spacing: 0.01em;
-            }
-
-            .change-badge.positive {
-                background: rgba(34, 197, 94, 0.12);
-                color: var(--state-success, #22C55E);
-            }
-
-            .change-badge.negative {
-                background: rgba(239, 68, 68, 0.12);
-                color: var(--state-error, #EF4444);
-            }
-
-            /* ── Market cap / volume ── */
-            .data-value {
-                font-weight: 600;
-                color: var(--text-primary);
-                font-variant-numeric: tabular-nums;
-                font-size: 0.9rem;
-            }
-
-            /* ── Action buttons (scoped to table card) ── */
-            .cv-table-card .btn-sm {
-                padding: 0.3rem 0.6rem;
-                font-size: 0.82rem;
-                transition: all 0.18s ease;
-                min-width: 32px;
-            }
-
-            .cv-table-card .btn-outline-warning {
-                border-color: rgba(245, 158, 11, 0.55);
-                color: #F59E0B;
-            }
-
-            .cv-table-card .btn-outline-warning:hover {
-                background: rgba(245, 158, 11, 0.12);
-                border-color: #F59E0B;
-                color: #FBBF24;
-                box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
-            }
-
-            .cv-table-card .btn-outline-info {
-                border-color: rgba(34, 197, 94, 0.5);
-                color: #22C55E;
-            }
-
-            .cv-table-card .btn-outline-info:hover {
-                background: rgba(34, 197, 94, 0.10);
-                border-color: #22C55E;
-                color: #4ADE80;
-                box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
-            }
-
-            .cv-table-card .btn-outline-primary {
-                border-color: rgba(99, 102, 241, 0.5);
-                color: #818CF8;
-            }
-
-            .cv-table-card .btn-outline-primary:hover {
-                background: rgba(99, 102, 241, 0.10);
-                border-color: #818CF8;
-                color: #A5B4FC;
-                box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
-            }
-
-            .cv-table-card .btn-outline-danger {
-                border-color: rgba(239, 68, 68, 0.5);
-                color: #F87171;
-            }
-
-            .cv-table-card .btn-outline-danger:hover {
-                background: rgba(239, 68, 68, 0.10);
-                border-color: #EF4444;
-                color: #FCA5A5;
-                box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
-            }
-
-            /* ── Footer bar ── */
-            .cv-table-footer {
-                background: var(--cv-table-header-bg);
-                border-top: 1px solid var(--cv-table-border);
-                padding: 0.6rem 1.1rem;
-                font-size: 0.78rem;
-                color: var(--text-secondary);
-                display: flex;
-                align-items: center;
-                gap: 0.4rem;
-                opacity: 1;
-            }
-
-            .crypto-cards-grid {
-                display: grid;
-                gap: 1rem;
-                width: 100%;
-                max-width: 100%;
-                margin: 0 auto;
-                align-items: stretch;
-                grid-template-columns: 1fr;
-            }
-
-            .crypto-cards-grid>* {
-                min-width: 0;
-            }
-
-            /* ═══ Accordion Card ═══ */
-            .crypto-accordion-card.chart-card,
-            .crypto-accordion-card {
-                position: relative;
-                margin-bottom: 0;
-                width: 100%;
-                max-width: 100%;
-                padding: 0 !important;
-                overflow: hidden;
-                cursor: default;
-                border: 1px solid rgba(235, 118, 18, 0.35);
-                border-radius: 14px;
-                box-shadow:
-                    0 0 12px rgba(235, 118, 18, 0.20),
-                    0 4px 20px rgba(0, 0, 0, 0.35);
-                transition: box-shadow 0.28s ease, border-color 0.28s ease;
-                display: flex;
-                flex-direction: column;
-                box-sizing: border-box;
-                height: auto;
-                min-height: unset;
-            }
-
-            .crypto-accordion-card:hover {
-                background: inherit;
-                border-color: var(--hover-card-border);
-                box-shadow: var(--hover-card-shadow);
-                transform: var(--hover-card-transform);
-            }
-
-            .crypto-accordion-card.expanded {
-                border-color: rgba(235, 118, 18, 0.55);
-                box-shadow:
-                    0 0 18px rgba(235, 118, 18, 0.32),
-                    0 6px 28px rgba(0, 0, 0, 0.42);
-            }
-
-            /* ═══ Clickable Header ═══ */
-            .crypto-accordion-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 0.75rem;
-                padding: 0.65rem 1rem !important;
-                min-height: unset !important;
-                cursor: pointer;
-                user-select: none;
-                -webkit-tap-highlight-color: transparent;
-                transition: background 0.2s ease;
-                flex-wrap: nowrap;
-            }
-
-            .crypto-accordion-header:hover {
-                background: transparent;
-            }
-
-            .crypto-accordion-header:focus-visible {
-                outline: 2px solid rgba(235, 118, 18, 0.55);
-                outline-offset: -2px;
-                border-radius: 15px;
-            }
-
-            .crypto-accordion-header-left {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-                min-width: 0;
-                flex: 1 1 auto;
-            }
-
-            .crypto-accordion-title {
-                min-width: 0;
-            }
-
-            .crypto-accordion-title h3 {
-                font-size: 1rem;
-                font-weight: 700;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-                line-height: 1.35;
-            }
-
-            .crypto-accordion-title p {
-                font-size: 0.75rem;
-                overflow: hidden;
-                white-space: nowrap;
-                text-overflow: ellipsis;
-            }
-
-            .crypto-accordion-header-right {
-                display: flex;
-                align-items: center;
-                gap: 0.4rem;
-                flex-shrink: 0;
-                flex-wrap: nowrap;
-                justify-content: flex-end;
-                white-space: nowrap;
-                min-width: 0;
-            }
-
-            .crypto-accordion-header-right .price-value {
-                font-size: 0.95rem;
-                white-space: nowrap;
-            }
-
-            .crypto-accordion-header-right .kpi-change-badge {
-                font-size: 0.78rem;
-                padding: 0.2rem 0.55rem;
-                white-space: nowrap;
-            }
-
-            /* ═══ Chevron ═══ */
-            /* ═══ Chevron: inline in header-right ═══ */
-            .crypto-accordion-chevron {
-                pointer-events: none;
-                display: inline-flex !important;
-                align-items: center;
-                justify-content: center;
-                color: #EB7612 !important;
-                font-size: 1rem;
-                transition: transform 0.25s ease;
-                flex-shrink: 0;
-            }
-
-            .crypto-accordion-card.expanded .crypto-accordion-chevron {
-                transform: rotate(180deg);
-            }
-
-            .crypto-accordion-card.expanded .crypto-accordion-chevron {
-                transform: rotate(180deg);
-            }
-
-            /* ═══ Always visible metrics — 2×2 grid ═══ */
-            .crypto-accordion-metrics {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 0.4rem 1rem;
-                padding: 0.5rem 1rem 0.5rem !important;
-                border-top: 1px solid rgba(235, 118, 18, 0.14);
-            }
-
-            .crypto-accordion-metrics .stat-row {
-                margin: 0 !important;
-                padding: 0 !important;
-                font-size: 0.82rem;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.05rem;
-                border-bottom: none;
-                min-height: 0;
-            }
-
-            .crypto-accordion-metrics .stat-label {
-                font-size: 0.68rem;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: var(--text-secondary);
-                opacity: 0.8;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 100%;
-            }
-
-            .crypto-accordion-metrics .data-value {
-                font-size: 0.88rem;
-                font-weight: 600;
-                color: var(--text-primary);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 100%;
-                min-width: 0;
-            }
-
-            .cv-notes-indicator {
-                color: var(--state-success, #22C55E);
-                font-weight: 600;
-                font-size: 0.82rem;
-            }
-
-            /* ═══ Expandable body ═══ */
-            .crypto-accordion-body {
-                max-height: 0;
-                min-height: 0;
-                opacity: 0;
-                overflow: hidden;
-                padding: 0 0.85rem;
-                transition:
-                    max-height 0.28s ease,
-                    opacity 0.22s ease,
-                    padding 0.22s ease;
-            }
-
-            .crypto-accordion-body.cv-expanded {
-                max-height: 120px;
-                min-height: auto;
-                opacity: 1;
-                padding: 0.45rem 0.85rem 0.55rem;
-            }
-
-            .crypto-accordion-body.cv-collapsed {
-                max-height: 0;
-                min-height: 0;
-                opacity: 0;
-                padding: 0 0.85rem;
-            }
-
-            /* ═══ Action buttons grid ═══ */
-            .crypto-accordion-actions {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 0.35rem;
-                padding-top: 0.4rem;
-                border-top: 1px solid rgba(235, 118, 18, 0.18);
-            }
-
-            .crypto-accordion-actions .cv-mobile-btn {
-                min-width: 0;
-            }
-
-            /* ═══ Responsive breakpoints ═══ */
-
-            /* Desktop: CSS Grid con columnas anchas (mín 440px) */
-            @@media (min-width: 1026px) {
-                .crypto-cards-grid {
-                    grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
-                }
-
-                .crypto-accordion-metrics {
-                    grid-template-columns: repeat(4, 1fr);
-                }
-            }
-
-            /* Always hide the desktop table */
-
-            /* Tablet / iPad Pro: 2 columns */
-            @@media (max-width: 1025px) {
-                .crypto-cards-grid {
-                    grid-template-columns: repeat(2, 1fr);
-                }
-
-                .cv-responsive-cards,
-                .crypto-cards-grid,
-                .crypto-accordion-card {
-                    max-width: 100%;
-                    overflow-x: clip;
-                }
-            }
-
-            /* Mobile: 1 column */
-            @@media (max-width: 767px) {
-                .crypto-cards-grid {
-                    grid-template-columns: 1fr;
-                }
-
-                .crypto-accordion-header {
-                    padding: 0.6rem 0.75rem !important;
-                }
-
-                .crypto-accordion-header-right .price-value {
-                    font-size: 0.88rem;
-                }
-
-                .crypto-accordion-header-right .kpi-change-badge {
-                    font-size: 0.74rem;
-                }
-
-                .crypto-accordion-metrics {
-                    grid-template-columns: 1fr 1fr;
-                    gap: 0.3rem 0.75rem;
-                    padding: 0.4rem 0.75rem !important;
-                }
-            }
-
-            /* ── Search results dropdown ── */
-            .search-results-dropdown {
-                max-height: 280px;
-                overflow-y: auto;
-                border: 1px solid rgba(255, 122, 0, 0.25);
-                border-radius: 10px;
-                background: var(--bg-card, #1A2236);
-                padding: 4px;
-                animation: slideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-                scrollbar-width: thin;
-                scrollbar-color: rgba(255, 122, 0, 0.3) transparent;
-            }
-
-            .search-results-dropdown::-webkit-scrollbar {
-                width: 5px;
-            }
-
-            .search-results-dropdown::-webkit-scrollbar-track {
-                background: transparent;
-            }
-
-            .search-results-dropdown::-webkit-scrollbar-thumb {
-                background: rgba(255, 122, 0, 0.30);
-                border-radius: 4px;
-            }
-
-            .search-results-header {
-                font-size: 10px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                color: var(--text-secondary, #9CA3AF);
-                padding: 5px 10px 6px;
-                border-bottom: 1px solid rgba(255, 122, 0, 0.10);
-                margin-bottom: 3px;
-            }
-
-            .search-result-item {
-                display: flex;
-                align-items: center;
-                padding: 9px 10px;
-                border-radius: 7px;
-                border: 1.5px solid transparent;
-                margin-bottom: 2px;
-                cursor: pointer;
-                transition: background 0.13s ease, border-color 0.13s ease, box-shadow 0.13s ease;
-                outline: none;
-            }
-
-            .search-result-item:hover {
-                background: rgba(255, 122, 0, 0.06);
-                border-color: rgba(255, 122, 0, 0.15);
-            }
-
-            .search-result-selected {
-                background: rgba(255, 122, 0, 0.10) !important;
-                border-color: rgba(255, 122, 0, 0.55) !important;
-                box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.07);
-            }
-
-            .search-result-selected:hover {
-                background: rgba(255, 122, 0, 0.15) !important;
-            }
-
-            .search-result-name {
-                font-size: 0.88rem;
-                font-weight: 600;
-                color: var(--accent, #FF7A00);
-            }
-
-            .search-result-symbol {
-                font-size: 0.78rem;
-                color: var(--text-secondary, #9CA3AF);
-                margin-left: 6px;
-            }
-
-            .search-result-id {
-                font-size: 0.72rem;
-                font-weight: 600;
-                font-variant-numeric: tabular-nums;
-                color: var(--brand-blue, #3B82F6);
-                background: rgba(59, 130, 246, 0.12);
-                padding: 1px 7px;
-                border-radius: 5px;
-            }
-
-            .search-result-caret {
-                font-size: 0.65rem;
-                color: var(--accent, #FF7A00);
-                flex-shrink: 0;
-                animation: cv-fade-in 0.15s ease both;
-            }
-
-            .search-result-enter-hint {
-                font-size: 0.8rem;
-                font-weight: 700;
-                color: rgba(255, 122, 0, 0.70);
-                background: rgba(255, 122, 0, 0.10);
-                border: 1px solid rgba(255, 122, 0, 0.25);
-                border-radius: 4px;
-                padding: 0 5px;
-                line-height: 1.5;
-                flex-shrink: 0;
-            }
-
-            @@keyframes slideDown {
-                from {
-                    opacity: 0;
-                    transform: translateY(-10px);
-                }
-
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-
-            /* ══════════════════════════════════════════════
-                                   Notes Modal — CryptoView dark/orange design
-                                ══════════════════════════════════════════════ */
-
-            /* Overlay */
-            .cv-notes-overlay {
-                position: fixed;
-                inset: 0;
-                background: rgba(0, 0, 0, 0.72);
-                backdrop-filter: blur(3px);
-                z-index: 1040;
-                animation: cvOverlayIn 0.18s ease both;
-            }
-
-            @@keyframes cvOverlayIn {
-                from {
-                    opacity: 0;
-                }
-
-                to {
-                    opacity: 1;
-                }
-            }
-
-            /* Modal panel */
-            .cv-notes-modal {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                z-index: 1050;
-                width: min(680px, 94vw);
-                max-height: 88vh;
-                display: flex;
-                flex-direction: column;
-                background: #0b1e36;
-                border: 1.5px solid rgba(255, 122, 0, 0.45);
-                border-radius: 18px;
-                box-shadow: 0 0 0 1px rgba(255, 122, 0, 0.12),
-                    0 8px 40px rgba(0, 0, 0, 0.7),
-                    0 0 60px rgba(255, 122, 0, 0.12);
-                animation: cvModalIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
-            }
-
-            @@keyframes cvModalIn {
-                from {
-                    opacity: 0;
-                    transform: translate(-50%, -47%) scale(0.97);
-                }
-
-                to {
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(1);
-                }
-            }
-
-            /* Header */
-            .cv-notes-modal-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 1rem 1.25rem;
-                border-bottom: 1px solid rgba(255, 122, 0, 0.22);
-                flex-shrink: 0;
-            }
-
-            .cv-notes-modal-title {
-                display: flex;
-                align-items: center;
-                gap: 0.6rem;
-                font-size: 1rem;
-                font-weight: 600;
-                color: #e5e7eb;
-            }
-
-            .cv-notes-coin-badge {
-                background: linear-gradient(135deg, rgba(255, 122, 0, 0.85), rgba(224, 101, 0, 0.85));
-                color: #fff;
-                font-size: 0.72rem;
-                font-weight: 700;
-                padding: 3px 8px;
-                border-radius: 6px;
-                letter-spacing: 0.04em;
-            }
-
-            .cv-notes-close-btn {
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                color: #9ca3af;
-                border-radius: 8px;
-                width: 32px;
-                height: 32px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 0.9rem;
-                cursor: pointer;
-                transition: background 0.15s, color 0.15s, border-color 0.15s;
-                flex-shrink: 0;
-            }
-
-            .cv-notes-close-btn:hover {
-                background: rgba(255, 80, 80, 0.18);
-                border-color: rgba(255, 80, 80, 0.4);
-                color: #f87171;
-            }
-
-            /* Scrollable body */
-            .cv-notes-modal-body {
-                overflow-y: auto;
-                padding: 1.25rem;
-                flex: 1;
-                scrollbar-width: thin;
-                scrollbar-color: rgba(255, 122, 0, 0.3) transparent;
-            }
-
-            .cv-notes-modal-body::-webkit-scrollbar {
-                width: 5px;
-            }
-
-            .cv-notes-modal-body::-webkit-scrollbar-thumb {
-                background: rgba(255, 122, 0, 0.30);
-                border-radius: 4px;
-            }
-
-            /* Add-note form card */
-            .cv-note-form-card {
-                background: rgba(255, 122, 0, 0.04);
-                border: 1px solid rgba(255, 122, 0, 0.22);
-                border-radius: 12px;
-                padding: 1rem 1.1rem;
-                margin-bottom: 1.25rem;
-            }
-
-            .cv-note-form-title {
-                font-size: 0.82rem;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                color: #FF7A00;
-                margin-bottom: 0.75rem;
-            }
-
-            .cv-note-input {
-                width: 100%;
-                background: #071220;
-                border: 1px solid rgba(255, 122, 0, 0.28);
-                border-radius: 8px;
-                color: #e5e7eb;
-                padding: 0.55rem 0.75rem;
-                font-size: 0.9rem;
-                font-family: inherit;
-                outline: none;
-                transition: border-color 0.15s, box-shadow 0.15s;
-            }
-
-            .cv-note-input::placeholder {
-                color: rgba(156, 163, 175, 0.55);
-            }
-
-            .cv-note-input:focus {
-                border-color: rgba(255, 122, 0, 0.65);
-                box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.10);
-            }
-
-            .cv-note-textarea {
-                resize: vertical;
-                min-height: 72px;
-            }
-
-            .cv-note-form-footer {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-wrap: wrap;
-                gap: 0.6rem;
-                margin-top: 0.75rem;
-            }
-
-            /* Priority toggle buttons */
-            .cv-priority-group {
-                display: flex;
-                gap: 0.4rem;
-                flex-wrap: wrap;
-            }
-
-            .cv-priority-btn {
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                color: #9ca3af;
-                border-radius: 7px;
-                padding: 4px 10px;
-                font-size: 0.8rem;
-                cursor: pointer;
-                transition: background 0.13s, border-color 0.13s, color 0.13s;
-            }
-
-            .cv-priority-btn:hover {
-                background: rgba(255, 255, 255, 0.09);
-                color: #e5e7eb;
-            }
-
-            .cv-priority-btn.active-low {
-                background: rgba(34, 197, 94, 0.15);
-                border-color: rgba(34, 197, 94, 0.45);
-                color: #4ade80;
-            }
-
-            .cv-priority-btn.active-mid {
-                background: rgba(234, 179, 8, 0.15);
-                border-color: rgba(234, 179, 8, 0.45);
-                color: #facc15;
-            }
-
-            .cv-priority-btn.active-high {
-                background: rgba(239, 68, 68, 0.15);
-                border-color: rgba(239, 68, 68, 0.45);
-                color: #f87171;
-            }
-
-            /* Add button */
-            .cv-note-add-btn {
-                background: #FF7A00;
-                border: none;
-                border-radius: 8px;
-                color: #fff;
-                font-weight: 600;
-                font-size: 0.88rem;
-                padding: 6px 16px;
-                cursor: pointer;
-                transition: background 0.15s, box-shadow 0.15s;
-            }
-
-            .cv-note-add-btn:hover {
-                background: #e86d00;
-                box-shadow: 0 4px 14px rgba(255, 122, 0, 0.38);
-            }
-
-            /* Validation error */
-            .cv-note-validation-error {
-                background: rgba(239, 68, 68, 0.12);
-                border: 1px solid rgba(239, 68, 68, 0.35);
-                color: #f87171;
-                border-radius: 8px;
-                padding: 0.45rem 0.8rem;
-                font-size: 0.83rem;
-                margin-bottom: 0.6rem;
-            }
-
-            /* Notes count label */
-            .cv-notes-count-label {
-                font-size: 0.78rem;
-                color: rgba(156, 163, 175, 0.7);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                font-weight: 600;
-                margin-bottom: 0.6rem;
-            }
-
-            /* Note card */
-            .cv-note-card {
-                background: #0d2040;
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                border-left: 3px solid rgba(255, 255, 255, 0.15);
-                border-radius: 10px;
-                padding: 0.85rem 1rem;
-                margin-bottom: 0.6rem;
-                transition: box-shadow 0.15s, border-color 0.15s;
-            }
-
-            .cv-note-card:hover {
-                box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-            }
-
-            .cv-note-priority-1 {
-                border-left-color: #4ade80;
-            }
-
-            .cv-note-priority-2 {
-                border-left-color: #facc15;
-            }
-
-            .cv-note-priority-3 {
-                border-left-color: #f87171;
-            }
-
-            .cv-note-card-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                gap: 0.5rem;
-                margin-bottom: 0.4rem;
-            }
-
-            .cv-note-card-title {
-                font-weight: 600;
-                font-size: 0.93rem;
-                color: #e5e7eb;
-                line-height: 1.35;
-            }
-
-            .cv-note-delete-btn {
-                background: transparent;
-                border: 1px solid rgba(239, 68, 68, 0.3);
-                color: rgba(248, 113, 113, 0.7);
-                border-radius: 6px;
-                width: 28px;
-                height: 28px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 0.82rem;
-                cursor: pointer;
-                flex-shrink: 0;
-                transition: background 0.13s, color 0.13s, border-color 0.13s;
-            }
-
-            .cv-note-delete-btn:hover {
-                background: rgba(239, 68, 68, 0.18);
-                border-color: rgba(239, 68, 68, 0.6);
-                color: #f87171;
-            }
-
-            .cv-note-card-content {
-                font-size: 0.875rem;
-                color: rgba(229, 231, 235, 0.78);
-                line-height: 1.55;
-                margin-bottom: 0.35rem;
-                white-space: pre-wrap;
-            }
-
-            .cv-note-card-meta {
-                font-size: 0.74rem;
-                color: rgba(156, 163, 175, 0.6);
-            }
-
-            /* Empty state */
-            .cv-notes-empty {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 2.5rem 1rem;
-                text-align: center;
-                color: rgba(156, 163, 175, 0.6);
-            }
-
-            .cv-notes-empty i {
-                font-size: 2.8rem;
-                color: rgba(255, 122, 0, 0.3);
-                margin-bottom: 0.75rem;
-            }
-
-            .cv-notes-empty p {
-                font-size: 0.9rem;
-                color: rgba(229, 231, 235, 0.55);
-                margin-bottom: 0.25rem;
-            }
-
-            .cv-notes-empty small {
-                font-size: 0.8rem;
-            }
-
-            /* Responsive mobile */
-            @@media(max-width: 600px) {
-                .cv-notes-modal {
-                    border-radius: 14px;
-                }
-
-                .cv-note-form-footer {
-                    flex-direction: column;
-                    align-items: stretch;
-                }
-
-                .cv-note-add-btn {
-                    width: 100%;
-                    text-align: center;
-                }
-            }
-
-            /* =====================================================
-                    Mobile Accordion Cards � 320px to 768px
-                    Premium fintech mobile-first UI
-                    ===================================================== */
-
-            .cv-mobile-list {
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-sm, 12px);
-            }
-
-            .cv-mobile-card {
-                background: var(--cv-table-container-bg, #0F172A);
-                border: 1px solid var(--cv-table-border, rgba(255, 255, 255, 0.06));
-                border-radius: 14px;
-                overflow: hidden;
-                transition: border-color 0.22s ease, box-shadow 0.22s ease;
-            }
-
-            .cv-mobile-card.is-open {
-                border-color: rgba(255, 122, 0, 0.38);
-                box-shadow: 0 0 14px rgba(255, 143, 0, 0.22);
-            }
-
-            .cv-mobile-card-header {
-                width: 100%;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 13px 14px;
-                background: transparent;
-                border: none;
-                cursor: pointer;
-                text-align: left;
-                min-height: 68px;
-                transition: background 0.15s ease;
-                outline: none;
-            }
-
-            .cv-mobile-card-header:focus-visible {
-                outline: 2px solid rgba(255, 122, 0, 0.55);
-                outline-offset: -2px;
-            }
-
-            .cv-mobile-card-header:active {
-                background: rgba(255, 122, 0, 0.05);
-            }
-
-            .cv-mobile-left {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                flex: 1;
-                min-width: 0;
-            }
-
-            .cv-mobile-card.crypto-symbol {
-                width: 40px;
-                height: 40px;
-                min-width: 40px;
-                font-size: 0.65rem;
-                border-radius: 10px;
-                flex-shrink: 0;
-            }
-
-            .cv-mobile-name {
-                display: flex;
-                flex-direction: column;
-                min-width: 0;
-            }
-
-            .cv-mobile-name-text {
-                font-weight: 600;
-                font-size: 0.9rem;
-                color: var(--cv-accent, #F59E0B);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                line-height: 1.25;
-            }
-
-            .cv-mobile-ticker {
-                font-size: 0.7rem;
-                color: #94A3B8;
-                margin-top: 1px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            .cv-mobile-right {
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                gap: 4px;
-                flex-shrink: 0;
-            }
-
-            .cv-mobile-price {
-                font-weight: 700;
-                font-size: 0.95rem;
-                color: var(--cv-blue-accent, #22C55E);
-                font-variant-numeric: tabular-nums;
-                white-space: nowrap;
-            }
-
-            .cv-mobile-card.change-badge {
-                font-size: 0.74rem;
-                padding: 3px 7px;
-                border-radius: 7px;
-            }
-
-            .cv-mobile-chevron {
-                font-size: 0.88rem;
-                color: #64748B;
-                flex-shrink: 0;
-                transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), color 0.22s ease;
-                margin-left: 2px;
-            }
-
-            .cv-mobile-card.is-open .cv-mobile-chevron {
-                transform: rotate(180deg);
-                color: #FF7A00;
-            }
-
-            /* CSS grid accordion � smooth, no JS height measurement */
-            .cv-mobile-card-body {
-                display: grid;
-                grid-template-rows: 0fr;
-                transition: grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-            }
-
-            .cv-mobile-card.is-open .cv-mobile-card-body {
-                grid-template-rows: 1fr;
-            }
-
-            .cv-mobile-card-inner {
-                overflow: hidden;
-                min-height: 0;
-            }
-
-            .cv-mobile-details {
-                padding: 0 14px;
-                border-top: 1px solid rgba(255, 255, 255, 0.06);
-            }
-
-            .cv-detail-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 9px 0;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-                gap: 8px;
-            }
-
-            .cv-detail-row:last-child {
-                border-bottom: none;
-            }
-
-            .cv-detail-label {
-                font-size: 0.79rem;
-                color: #64748B;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                flex-shrink: 0;
-            }
-
-            .cv-detail-label i {
-                font-size: 0.77rem;
-                color: rgba(255, 122, 0, 0.55);
-            }
-
-            .cv-detail-value {
-                font-size: 0.84rem;
-                font-weight: 600;
-                color: #E2E8F0;
-                font-variant-numeric: tabular-nums;
-                text-align: right;
-                word-break: break-all;
-            }
-
-            .cv-coin-id-text {
-                font-size: 0.77rem;
-                color: #94A3B8;
-                font-weight: 500;
-            }
-
-            .cv-mobile-actions {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-                padding: 12px 14px 14px;
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
-            }
-
-            .cv-mobile-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
-                padding: 0.22rem 0.4rem !important;
-                border-radius: 8px;
-                font-size: 0.72rem;
-                font-weight: 600;
-                cursor: pointer;
-                border: 1px solid rgba(255, 122, 0, 0.30);
-                background: rgba(255, 250, 245, 0.9);
-                color: #c05600;
-                min-height: 30px !important;
-                box-shadow: none;
-                transition: all 0.28s ease;
-                outline: none;
-                -webkit-tap-highlight-color: transparent;
-            }
-
-            .cv-mobile-btn:hover {
-                transform: translateY(-2px);
-                border-color: #e06c00;
-                color: #9a3d00;
-                background: rgba(255, 245, 235, 0.95);
-                box-shadow: 0 0 0 1px rgba(255, 122, 0, 0.3);
-            }
-
-            .cv-mobile-btn:active {
-                transform: scale(0.97);
-            }
-
-            .cv-mobile-btn:focus-visible {
-                outline: 2px solid rgba(235, 118, 18, 0.6);
-                outline-offset: 2px;
-            }
-
-            .cv-btn-badge {
-                background: rgba(235, 118, 18, 0.18);
-                border-radius: 5px;
-                padding: 1px 5px;
-                font-size: 0.7rem;
-                font-weight: 700;
-                color: #f7922a;
-            }
-
-            .cv-btn-notes {
-                /* inherits dark blue + orange glow */
-            }
-
-            .cv-btn-edit {
-                /* inherits dark blue + orange glow */
-            }
-
-            .cv-btn-delete {
-                background: rgba(255, 250, 245, 0.9);
-                border-color: rgba(239, 68, 68, 0.45);
-                color: #dc2626;
-                box-shadow: none;
-            }
-
-            .cv-btn-delete:hover {
-                transform: translateY(-2px);
-                border-color: #dc2626;
-                color: #b91c1c;
-                background: rgba(254, 230, 230, 0.95);
-                box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
-            }
-
-            .cv-mobile-footer {
-                background: var(--cv-table-header-bg, #111827);
-                border: 1px solid var(--cv-table-border, rgba(255, 255, 255, 0.06));
-                border-radius: 12px;
-                padding: 0.6rem 1rem;
-                font-size: 0.78rem;
-                color: var(--text-secondary);
-                display: flex;
-                align-items: center;
-                gap: 0.4rem;
-            }
-
-            /* ═══ Light-mode accordion overrides ═══ */
-            :root.theme-light .crypto-accordion-card,
-            :root.theme-light .crypto-accordion-card.chart-card {
-                background: var(--cv-card);
-                border: 1px solid rgba(255, 138, 0, 0.35);
-                box-shadow:
-                    0 0 12px rgba(255, 138, 0, 0.18),
-                    0 4px 20px rgba(0, 0, 0, 0.08);
-                transition: all .22s ease;
-            }
-
-            :root.theme-light .crypto-accordion-card:hover {
-                background: var(--hover-card-bg) !important;
-                border-color: var(--hover-card-border) !important;
-                box-shadow: var(--hover-card-shadow) !important;
-                transform: var(--hover-card-transform);
-            }
-
-            :root.theme-light .crypto-accordion-card.expanded {
-                border-color: rgba(255, 138, 0, 0.55);
-                box-shadow:
-                    0 0 18px rgba(255, 138, 0, 0.28),
-                    0 6px 28px rgba(0, 0, 0, 0.10);
-            }
-
-            :root.theme-light .crypto-accordion-header:hover {
-                background: rgba(255, 138, 0, 0.08);
-            }
-
-            :root.theme-light .crypto-accordion-metrics {
-                border-top-color: rgba(255, 138, 0, 0.40);
-            }
-
-            :root.theme-light .crypto-accordion-actions {
-                border-top-color: rgba(255, 138, 0, 0.40);
-            }
-
-            :root.theme-light .crypto-accordion-title h3 {
-                color: #E86F00 !important;
-            }
-
-            :root.theme-light .crypto-accordion-chevron {
-                color: #FF8A00 !important;
-            }
-
-            /* ═══ Search toolbar — flex layout ═══ */
-            .search-toolbar {
-                display: flex;
-                gap: 1rem;
-                align-items: center;
-            }
-
-            .search-input-group {
-                display: flex;
-                align-items: center;
-                flex: 1;
-                min-width: 0;
-            }
-
-            .search-input-group .input-group-text {
-                flex-shrink: 0;
-            }
-
-            .search-input-group .form-control {
-                flex: 1;
-                min-width: 0;
-            }
-
-            .search-update-btn {
-                flex: 0 0 auto;
-                width: auto;
-                min-width: 180px;
-                max-width: 220px;
-                padding-inline: 1.25rem;
-                font-size: 0.9375rem;
-                font-weight: 600;
-                border-radius: 0.5rem;
-                white-space: nowrap;
-            }
-
-            @@media (max-width: 767px) {
-                .search-toolbar {
-                    flex-direction: column;
-                    align-items: stretch;
-                }
-
-                .search-input-group {
-                    width: 100%;
-                }
-
-                .search-update-btn {
-                    width: 100%;
-                    max-width: none;
-                    min-width: 0;
-                }
-            }
-        </style>
+        .crypto-accordion-metrics {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+
+    /* Always hide the desktop table */
+
+    /* Tablet / iPad Pro: 2 columns */
+    @@media (max-width: 1025px) {
+        .crypto-cards-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .cv-responsive-cards,
+        .crypto-cards-grid,
+        .crypto-accordion-card {
+            max-width: 100%;
+            overflow-x: clip;
+        }
+    }
+
+    /* Mobile: 1 column */
+    @@media (max-width: 767px) {
+        .crypto-cards-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .crypto-accordion-header {
+            padding: 0.6rem 0.75rem !important;
+        }
+
+        .crypto-accordion-header-right .price-value {
+            font-size: 0.88rem;
+        }
+
+        .crypto-accordion-header-right .kpi-change-badge {
+            font-size: 0.74rem;
+        }
+
+        .crypto-accordion-metrics {
+            grid-template-columns: 1fr 1fr;
+            gap: 0.3rem 0.75rem;
+            padding: 0.4rem 0.75rem !important;
+        }
+    }
+
+    /* ── Search results dropdown ── */
+    .search-results-dropdown {
+        max-height: 280px;
+        overflow-y: auto;
+        border: 1px solid rgba(255, 122, 0, 0.25);
+        border-radius: 10px;
+        background: var(--bg-card, #1A2236);
+        padding: 4px;
+        animation: slideDown 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 122, 0, 0.3) transparent;
+    }
+
+    .search-results-dropdown::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .search-results-dropdown::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .search-results-dropdown::-webkit-scrollbar-thumb {
+        background: rgba(255, 122, 0, 0.30);
+        border-radius: 4px;
+    }
+
+    .search-results-header {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-secondary, #9CA3AF);
+        padding: 5px 10px 6px;
+        border-bottom: 1px solid rgba(255, 122, 0, 0.10);
+        margin-bottom: 3px;
+    }
+
+    .search-result-item {
+        display: flex;
+        align-items: center;
+        padding: 9px 10px;
+        border-radius: 7px;
+        border: 1.5px solid transparent;
+        margin-bottom: 2px;
+        cursor: pointer;
+        transition: background 0.13s ease, border-color 0.13s ease, box-shadow 0.13s ease;
+        outline: none;
+    }
+
+    .search-result-item:hover {
+        background: rgba(255, 122, 0, 0.06);
+        border-color: rgba(255, 122, 0, 0.15);
+    }
+
+    .search-result-selected {
+        background: rgba(255, 122, 0, 0.10) !important;
+        border-color: rgba(255, 122, 0, 0.55) !important;
+        box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.07);
+    }
+
+    .search-result-selected:hover {
+        background: rgba(255, 122, 0, 0.15) !important;
+    }
+
+    .search-result-name {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--accent, #FF7A00);
+    }
+
+    .search-result-symbol {
+        font-size: 0.78rem;
+        color: var(--text-secondary, #9CA3AF);
+        margin-left: 6px;
+    }
+
+    .search-result-id {
+        font-size: 0.72rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: var(--brand-blue, #3B82F6);
+        background: rgba(59, 130, 246, 0.12);
+        padding: 1px 7px;
+        border-radius: 5px;
+    }
+
+    .search-result-caret {
+        font-size: 0.65rem;
+        color: var(--accent, #FF7A00);
+        flex-shrink: 0;
+        animation: cv-fade-in 0.15s ease both;
+    }
+
+    .search-result-enter-hint {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: rgba(255, 122, 0, 0.70);
+        background: rgba(255, 122, 0, 0.10);
+        border: 1px solid rgba(255, 122, 0, 0.25);
+        border-radius: 4px;
+        padding: 0 5px;
+        line-height: 1.5;
+        flex-shrink: 0;
+    }
+
+    @@keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* ══════════════════════════════════════════════
+                                                                           Notes Modal — CryptoView dark/orange design
+                                                                        ══════════════════════════════════════════════ */
+
+    /* Overlay */
+    .cv-notes-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(3px);
+        z-index: 1040;
+        animation: cvOverlayIn 0.18s ease both;
+    }
+
+    @@keyframes cvOverlayIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    /* Modal panel */
+    .cv-notes-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1050;
+        width: min(680px, 94vw);
+        max-height: 88vh;
+        display: flex;
+        flex-direction: column;
+        background: #0b1e36;
+        border: 1.5px solid rgba(255, 122, 0, 0.45);
+        border-radius: 18px;
+        box-shadow: 0 0 0 1px rgba(255, 122, 0, 0.12),
+            0 8px 40px rgba(0, 0, 0, 0.7),
+            0 0 60px rgba(255, 122, 0, 0.12);
+        animation: cvModalIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @@keyframes cvModalIn {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -47%) scale(0.97);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+    }
+
+    /* Header */
+    .cv-notes-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 122, 0, 0.22);
+        flex-shrink: 0;
+    }
+
+    .cv-notes-modal-title {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #e5e7eb;
+    }
+
+    .cv-notes-coin-badge {
+        background: linear-gradient(135deg, rgba(255, 122, 0, 0.85), rgba(224, 101, 0, 0.85));
+        color: #fff;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 6px;
+        letter-spacing: 0.04em;
+    }
+
+    .cv-notes-close-btn {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #9ca3af;
+        border-radius: 8px;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        flex-shrink: 0;
+    }
+
+    .cv-notes-close-btn:hover {
+        background: rgba(255, 80, 80, 0.18);
+        border-color: rgba(255, 80, 80, 0.4);
+        color: #f87171;
+    }
+
+    /* Scrollable body */
+    .cv-notes-modal-body {
+        overflow-y: auto;
+        padding: 1.25rem;
+        flex: 1;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 122, 0, 0.3) transparent;
+    }
+
+    .cv-notes-modal-body::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .cv-notes-modal-body::-webkit-scrollbar-thumb {
+        background: rgba(255, 122, 0, 0.30);
+        border-radius: 4px;
+    }
+
+    /* Add-note form card */
+    .cv-note-form-card {
+        background: rgba(255, 122, 0, 0.04);
+        border: 1px solid rgba(255, 122, 0, 0.22);
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .cv-note-form-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #FF7A00;
+        margin-bottom: 0.75rem;
+    }
+
+    .cv-note-input {
+        width: 100%;
+        background: #071220;
+        border: 1px solid rgba(255, 122, 0, 0.28);
+        border-radius: 8px;
+        color: #e5e7eb;
+        padding: 0.55rem 0.75rem;
+        font-size: 0.9rem;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .cv-note-input::placeholder {
+        color: rgba(156, 163, 175, 0.55);
+    }
+
+    .cv-note-input:focus {
+        border-color: rgba(255, 122, 0, 0.65);
+        box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.10);
+    }
+
+    .cv-note-textarea {
+        resize: vertical;
+        min-height: 72px;
+    }
+
+    .cv-note-form-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 0.75rem;
+    }
+
+    /* Priority toggle buttons */
+    .cv-priority-group {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+    }
+
+    .cv-priority-btn {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #9ca3af;
+        border-radius: 7px;
+        padding: 4px 10px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background 0.13s, border-color 0.13s, color 0.13s;
+    }
+
+    .cv-priority-btn:hover {
+        background: rgba(255, 255, 255, 0.09);
+        color: #e5e7eb;
+    }
+
+    .cv-priority-btn.active-low {
+        background: rgba(34, 197, 94, 0.15);
+        border-color: rgba(34, 197, 94, 0.45);
+        color: #4ade80;
+    }
+
+    .cv-priority-btn.active-mid {
+        background: rgba(234, 179, 8, 0.15);
+        border-color: rgba(234, 179, 8, 0.45);
+        color: #facc15;
+    }
+
+    .cv-priority-btn.active-high {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: rgba(239, 68, 68, 0.45);
+        color: #f87171;
+    }
+
+    /* Add button */
+    .cv-note-add-btn {
+        background: #FF7A00;
+        border: none;
+        border-radius: 8px;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.88rem;
+        padding: 6px 16px;
+        cursor: pointer;
+        transition: background 0.15s, box-shadow 0.15s;
+    }
+
+    .cv-note-add-btn:hover {
+        background: #e86d00;
+        box-shadow: 0 4px 14px rgba(255, 122, 0, 0.38);
+    }
+
+    /* Validation error */
+    .cv-note-validation-error {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        color: #f87171;
+        border-radius: 8px;
+        padding: 0.45rem 0.8rem;
+        font-size: 0.83rem;
+        margin-bottom: 0.6rem;
+    }
+
+    /* Notes count label */
+    .cv-notes-count-label {
+        font-size: 0.78rem;
+        color: rgba(156, 163, 175, 0.7);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        margin-bottom: 0.6rem;
+    }
+
+    /* Note card */
+    .cv-note-card {
+        background: #0d2040;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-left: 3px solid rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.6rem;
+        transition: box-shadow 0.15s, border-color 0.15s;
+    }
+
+    .cv-note-card:hover {
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    }
+
+    .cv-note-priority-1 {
+        border-left-color: #4ade80;
+    }
+
+    .cv-note-priority-2 {
+        border-left-color: #facc15;
+    }
+
+    .cv-note-priority-3 {
+        border-left-color: #f87171;
+    }
+
+    .cv-note-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .cv-note-card-title {
+        font-weight: 600;
+        font-size: 0.93rem;
+        color: #e5e7eb;
+        line-height: 1.35;
+    }
+
+    .cv-note-delete-btn {
+        background: transparent;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: rgba(248, 113, 113, 0.7);
+        border-radius: 6px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.82rem;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.13s, color 0.13s, border-color 0.13s;
+    }
+
+    .cv-note-delete-btn:hover {
+        background: rgba(239, 68, 68, 0.18);
+        border-color: rgba(239, 68, 68, 0.6);
+        color: #f87171;
+    }
+
+    .cv-note-card-content {
+        font-size: 0.875rem;
+        color: rgba(229, 231, 235, 0.78);
+        line-height: 1.55;
+        margin-bottom: 0.35rem;
+        white-space: pre-wrap;
+    }
+
+    .cv-note-card-meta {
+        font-size: 0.74rem;
+        color: rgba(156, 163, 175, 0.6);
+    }
+
+    /* Empty state */
+    .cv-notes-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 1rem;
+        text-align: center;
+        color: rgba(156, 163, 175, 0.6);
+    }
+
+    .cv-notes-empty i {
+        font-size: 2.8rem;
+        color: rgba(255, 122, 0, 0.3);
+        margin-bottom: 0.75rem;
+    }
+
+    .cv-notes-empty p {
+        font-size: 0.9rem;
+        color: rgba(229, 231, 235, 0.55);
+        margin-bottom: 0.25rem;
+    }
+
+    .cv-notes-empty small {
+        font-size: 0.8rem;
+    }
+
+    /* Responsive mobile */
+    @@media(max-width: 600px) {
+        .cv-notes-modal {
+            border-radius: 14px;
+        }
+
+        .cv-note-form-footer {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .cv-note-add-btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* =====================================================
+                                                            Mobile Accordion Cards � 320px to 768px
+                                                            Premium fintech mobile-first UI
+                                                            ===================================================== */
+
+    .cv-mobile-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm, 12px);
+    }
+
+    .cv-mobile-card {
+        background: var(--cv-table-container-bg, #0F172A);
+        border: 1px solid var(--cv-table-border, rgba(255, 255, 255, 0.06));
+        border-radius: 14px;
+        overflow: hidden;
+        transition: border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .cv-mobile-card.is-open {
+        border-color: rgba(255, 122, 0, 0.38);
+        box-shadow: 0 0 14px rgba(255, 143, 0, 0.22);
+    }
+
+    .cv-mobile-card-header {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 14px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        min-height: 68px;
+        transition: background 0.15s ease;
+        outline: none;
+    }
+
+    .cv-mobile-card-header:focus-visible {
+        outline: 2px solid rgba(255, 122, 0, 0.55);
+        outline-offset: -2px;
+    }
+
+    .cv-mobile-card-header:active {
+        background: rgba(255, 122, 0, 0.05);
+    }
+
+    .cv-mobile-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .cv-mobile-card.crypto-symbol {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        font-size: 0.65rem;
+        border-radius: 10px;
+        flex-shrink: 0;
+    }
+
+    .cv-mobile-name {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .cv-mobile-name-text {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--cv-accent, #F59E0B);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.25;
+    }
+
+    .cv-mobile-ticker {
+        font-size: 0.7rem;
+        color: #94A3B8;
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .cv-mobile-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .cv-mobile-price {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--cv-blue-accent, #22C55E);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .cv-mobile-card.change-badge {
+        font-size: 0.74rem;
+        padding: 3px 7px;
+        border-radius: 7px;
+    }
+
+    .cv-mobile-chevron {
+        font-size: 0.88rem;
+        color: #64748B;
+        flex-shrink: 0;
+        transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), color 0.22s ease;
+        margin-left: 2px;
+    }
+
+    .cv-mobile-card.is-open .cv-mobile-chevron {
+        transform: rotate(180deg);
+        color: #FF7A00;
+    }
+
+    /* CSS grid accordion � smooth, no JS height measurement */
+    .cv-mobile-card-body {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .cv-mobile-card.is-open .cv-mobile-card-body {
+        grid-template-rows: 1fr;
+    }
+
+    .cv-mobile-card-inner {
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .cv-mobile-details {
+        padding: 0 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .cv-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 9px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        gap: 8px;
+    }
+
+    .cv-detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .cv-detail-label {
+        font-size: 0.79rem;
+        color: #64748B;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+    }
+
+    .cv-detail-label i {
+        font-size: 0.77rem;
+        color: rgba(255, 122, 0, 0.55);
+    }
+
+    .cv-detail-value {
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #E2E8F0;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        word-break: break-all;
+    }
+
+    .cv-coin-id-text {
+        font-size: 0.77rem;
+        color: #94A3B8;
+        font-weight: 500;
+    }
+
+    .cv-mobile-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 12px 14px 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .cv-mobile-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 0.22rem 0.4rem !important;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid rgba(255, 122, 0, 0.30);
+        background: rgba(255, 250, 245, 0.9);
+        color: #c05600;
+        min-height: 30px !important;
+        box-shadow: none;
+        transition: all 0.28s ease;
+        outline: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .cv-mobile-btn:hover {
+        transform: translateY(-2px);
+        border-color: #e06c00;
+        color: #9a3d00;
+        background: rgba(255, 245, 235, 0.95);
+        box-shadow: 0 0 0 1px rgba(255, 122, 0, 0.3);
+    }
+
+    .cv-mobile-btn:active {
+        transform: scale(0.97);
+    }
+
+    .cv-mobile-btn:focus-visible {
+        outline: 2px solid rgba(235, 118, 18, 0.6);
+        outline-offset: 2px;
+    }
+
+    .cv-btn-badge {
+        background: rgba(235, 118, 18, 0.18);
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #f7922a;
+    }
+
+    .cv-btn-notes {
+        /* inherits dark blue + orange glow */
+    }
+
+    .cv-btn-edit {
+        /* inherits dark blue + orange glow */
+    }
+
+    .cv-btn-delete {
+        background: rgba(255, 250, 245, 0.9);
+        border-color: rgba(239, 68, 68, 0.45);
+        color: #dc2626;
+        box-shadow: none;
+    }
+
+    .cv-btn-delete:hover {
+        transform: translateY(-2px);
+        border-color: #dc2626;
+        color: #b91c1c;
+        background: rgba(254, 230, 230, 0.95);
+        box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
+    }
+
+    .cv-mobile-footer {
+        background: var(--cv-table-header-bg, #111827);
+        border: 1px solid var(--cv-table-border, rgba(255, 255, 255, 0.06));
+        border-radius: 12px;
+        padding: 0.6rem 1rem;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    /* ═══ Light-mode accordion overrides ═══ */
+    :root.theme-light .crypto-accordion-card,
+    :root.theme-light .crypto-accordion-card.chart-card {
+        background: var(--cv-card);
+        border: 1px solid rgba(255, 138, 0, 0.35);
+        box-shadow:
+            0 0 12px rgba(255, 138, 0, 0.18),
+            0 4px 20px rgba(0, 0, 0, 0.08);
+        transition: all .22s ease;
+    }
+
+    :root.theme-light .crypto-accordion-card:hover {
+        background: var(--hover-card-bg) !important;
+        border-color: var(--hover-card-border) !important;
+        box-shadow: var(--hover-card-shadow) !important;
+        transform: var(--hover-card-transform);
+    }
+
+    :root.theme-light .crypto-accordion-card.expanded {
+        border-color: rgba(255, 138, 0, 0.55);
+        box-shadow:
+            0 0 18px rgba(255, 138, 0, 0.28),
+            0 6px 28px rgba(0, 0, 0, 0.10);
+    }
+
+    :root.theme-light .crypto-accordion-header:hover {
+        background: rgba(255, 138, 0, 0.08);
+    }
+
+    :root.theme-light .crypto-accordion-metrics {
+        border-top-color: rgba(255, 138, 0, 0.40);
+    }
+
+    :root.theme-light .crypto-accordion-actions {
+        border-top-color: rgba(255, 138, 0, 0.40);
+    }
+
+    :root.theme-light .crypto-accordion-title h3 {
+        color: #E86F00 !important;
+    }
+
+    :root.theme-light .crypto-accordion-chevron {
+        color: #FF8A00 !important;
+    }
+
+    /* ═══ Search toolbar — flex layout ═══ */
+    .search-toolbar {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .search-input-group {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .search-input-group .input-group-text {
+        flex-shrink: 0;
+    }
+
+    .search-input-group .form-control {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .search-update-btn {
+        flex: 0 0 auto;
+        width: auto;
+        min-width: 180px;
+        max-width: 220px;
+        padding-inline: 1.25rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        white-space: nowrap;
+    }
+
+    @@media (max-width: 767px) {
+        .search-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-input-group {
+            width: 100%;
+        }
+
+        .search-update-btn {
+            width: 100%;
+            max-width: none;
+            min-width: 0;
+        }
+    }
+</style>
 
 @code {
     [Inject] private CryptoDbContext DbContext { get; set; } = default!;
@@ -1807,7 +1807,7 @@
     private string? modalError;
     private string? noteValidationError;
     private List<(string Id, string Name, string Symbol)> searchResults = new();
-    private int selectedResultIndex = -1; // -1 = nothing highlighted
+    private int selectedResultIndex = -1;
     private HashSet<int> expandedCryptoIds = new();
 
     private IEnumerable<CryptoCurrency> FilteredCryptos =>
@@ -1818,22 +1818,27 @@
                 c.Symbol.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                 c.CoinId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
 
+    [CascadingParameter(Name = "AuthInitialized")] bool AuthInitialized { get; set; } = true;
+
     protected override async Task OnInitializedAsync()
     {
+        if (!AuthInitialized) return;
         if (!AuthStateSvc.IsAuthenticated())
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
+        Loc.OnLanguageChanged += HandleLanguageChanged;
         await LoadCryptoCurrencies();
     }
 
     private async Task LoadCryptoCurrencies()
     {
-        cryptos = await DbContext.CryptoCurrencies
-            .Include(c => c.Notes)
-            .Where(c => c.IsActive)
-            .ToListAsync();
+        var userId = AuthStateSvc.GetCurrentUserId();
+        if (userId.HasValue)
+            cryptos = await FavoriteCryptoSvc.GetFavoriteCryptosAsync(userId.Value);
+        else
+            cryptos = new List<CryptoCurrency>();
     }
 
     private void ShowAddModal()
@@ -1877,8 +1882,16 @@
             isLoading = true;
             modalError = null;
 
+            var userId = AuthStateSvc.GetCurrentUserId();
+            if (!userId.HasValue)
+            {
+                modalError = Loc["cryptolist.invalidSession"];
+                return;
+            }
+
             if (isEditMode)
             {
+                // Editar: solo actualizar datos del catálogo si la moneda existe
                 var existing = await DbContext.CryptoCurrencies.FindAsync(currentCrypto.Id);
                 if (existing != null)
                 {
@@ -1890,48 +1903,26 @@
             }
             else
             {
+                // Agregar nueva moneda
                 var coinIdLower = currentCrypto.CoinId.ToLower().Trim();
-
-                // LOG: diagnóstico
                 Console.WriteLine($"[AddCrypto] Intentando agregar CoinId='{coinIdLower}'");
 
-                // Verificar si ya está activa (duplicado real)
-                var activeRecord = await DbContext.CryptoCurrencies
-                    .FirstOrDefaultAsync(c => c.CoinId.ToLower() == coinIdLower && c.IsActive);
+                // 1. Buscar en catálogo global (sin importar IsActive)
+                var existingInCatalog = await DbContext.CryptoCurrencies
+                    .FirstOrDefaultAsync(c => c.CoinId.ToLower() == coinIdLower);
 
-                if (activeRecord != null)
+                int cryptoIdToAdd;
+
+                if (existingInCatalog != null)
                 {
-                    Console.WriteLine($"[AddCrypto] Ya existe activa: Id={activeRecord.Id}, Name={activeRecord.Name}");
-                    modalError = "Esta criptomoneda ya existe en tu lista.";
-                    return;
-                }
-
-                // Verificar si existe eliminada (soft delete) → reactivar
-                var inactiveRecord = await DbContext.CryptoCurrencies
-                    .FirstOrDefaultAsync(c => c.CoinId.ToLower() == coinIdLower && !c.IsActive);
-
-                if (inactiveRecord != null)
-                {
-                    Console.WriteLine($"[AddCrypto] Encontrada inactiva Id={inactiveRecord.Id}, reactivando...");
-                    var priceData = await ApiService.GetCoinPriceAsync(coinIdLower);
-                    if (priceData != null)
-                    {
-                        inactiveRecord.CurrentPrice = priceData.Price;
-                        inactiveRecord.MarketCap = priceData.MarketCap;
-                        inactiveRecord.Volume24h = priceData.Volume24h;
-                        inactiveRecord.Change24h = priceData.Change24h;
-                        inactiveRecord.LastUpdated = priceData.LastUpdated;
-                    }
-                    inactiveRecord.IsActive = true;
-                    inactiveRecord.DateAdded = DateTime.UtcNow;
-                    await DbContext.SaveChangesAsync();
-                    Console.WriteLine($"[AddCrypto] Reactivada: {inactiveRecord.Name}");
-                    NotificationSvc.NotifyCryptoAdded(inactiveRecord.Name);
+                    // La moneda ya existe en el catálogo — reutilizar
+                    Console.WriteLine($"[AddCrypto] Existe en catálogo: Id={existingInCatalog.Id}, Name={existingInCatalog.Name}");
+                    cryptoIdToAdd = existingInCatalog.Id;
                 }
                 else
                 {
-                    // Nueva moneda
-                    Console.WriteLine($"[AddCrypto] No existe, creando nueva entrada.");
+                    // No existe en catálogo — crear nueva entrada
+                    Console.WriteLine($"[AddCrypto] No existe, creando en catálogo.");
                     var priceData = await ApiService.GetCoinPriceAsync(coinIdLower);
                     if (priceData != null)
                     {
@@ -1946,8 +1937,21 @@
                     currentCrypto.IsActive = true;
                     DbContext.CryptoCurrencies.Add(currentCrypto);
                     await DbContext.SaveChangesAsync();
-                    Console.WriteLine($"[AddCrypto] Creada con Id={currentCrypto.Id}");
+                    cryptoIdToAdd = currentCrypto.Id;
+                    Console.WriteLine($"[AddCrypto] Creada en catálogo con Id={cryptoIdToAdd}");
+                }
+
+                // 2. Agregar a FavoriteCryptoIds del usuario actual
+                var added = await FavoriteCryptoSvc.AddFavoriteCryptoAsync(userId.Value, cryptoIdToAdd);
+                if (added)
+                {
+                    Console.WriteLine($"[AddCrypto] Agregada a favoritos: cryptoId={cryptoIdToAdd}");
                     NotificationSvc.NotifyCryptoAdded(currentCrypto.Name);
+                }
+                else
+                {
+                    modalError = Loc["cryptolist.alreadyInList"];
+                    return;
                 }
             }
 
@@ -1956,7 +1960,7 @@
         }
         catch (Exception ex)
         {
-            modalError = $"Error: {ex.Message}";
+            modalError = Loc.Format("cryptolist.errorPrefix", ex.Message);
         }
         finally
         {
@@ -1966,13 +1970,16 @@
 
     private async Task DeleteCrypto(CryptoCurrency crypto)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", $"¿Eliminar {crypto.Name}?"))
+        if (await JSRuntime.InvokeAsync<bool>("confirm", Loc.Format("cryptolist.confirmDelete", crypto.Name)))
         {
-            crypto.IsActive = false;
-            await DbContext.SaveChangesAsync();
+            var userId = AuthStateSvc.GetCurrentUserId();
+            if (userId.HasValue)
+            {
+                // SOLO quitar de FavoriteCryptoIds del usuario actual.
+                // NO tocar CryptoCurrencies (catálogo global intacto).
+                await FavoriteCryptoSvc.RemoveFavoriteCryptoAsync(userId.Value, crypto.Id);
+            }
             await LoadCryptoCurrencies();
-
-            // Notificar que se eliminó la criptomoneda
             NotificationSvc.NotifyCryptoDeleted(crypto.Name);
         }
     }
@@ -2069,12 +2076,12 @@
         noteValidationError = null;
         if (string.IsNullOrWhiteSpace(newNote.Title))
         {
-            noteValidationError = "El título es obligatorio.";
+            noteValidationError = Loc["cryptolist.titleRequired"];
             return;
         }
         if (string.IsNullOrWhiteSpace(newNote.Content))
         {
-            noteValidationError = "El contenido es obligatorio.";
+            noteValidationError = Loc["cryptolist.contentRequired"];
             return;
         }
         await AddNote();
@@ -2097,7 +2104,7 @@
 
     private async Task DeleteNote(UserNote note)
     {
-        if (await JSRuntime.InvokeAsync<bool>("confirm", "¿Eliminar esta nota?"))
+        if (await JSRuntime.InvokeAsync<bool>("confirm", Loc["cryptolist.confirmDeleteNote"]))
         {
             DbContext.UserNotes.Remove(note);
             await DbContext.SaveChangesAsync();
@@ -2153,7 +2160,7 @@
     {
         if (string.IsNullOrWhiteSpace(searchQuery))
         {
-            modalError = "Por favor escribe el nombre de una criptomoneda";
+            modalError = Loc["cryptolist.pleaseWriteName"];
             return;
         }
 
@@ -2174,12 +2181,12 @@
             }
             else
             {
-                modalError = $"No se encontraron resultados para '{searchQuery}'";
+                modalError = Loc.Format("cryptolist.noResultsFor", searchQuery);
             }
         }
         catch (Exception ex)
         {
-            modalError = $"Error al buscar: {ex.Message}";
+            modalError = Loc.Format("cryptolist.searchError", ex.Message);
         }
         finally
         {
@@ -2238,4 +2245,18 @@
         3 => "🔴",
         _ => "⚪"
     };
+
+    private string NotesLabel(int count) => count == 1
+        ? Loc.Format("cryptolist.notesCountSingular", count)
+        : Loc.Format("cryptolist.notesCountPlural", count);
+
+    private void HandleLanguageChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
+    }
 }

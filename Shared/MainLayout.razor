@@ -3,121 +3,175 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject CryptoView.Services.NotificationService NotificationSvc
+@inject CryptoView.Services.LocalizacionService Loc
+@inject CryptoView.Services.TutorialService TutorialSvc
+@inject CryptoView.Services.ProfileService ProfileSvc
+@inject CryptoView.Services.AuthStateService AuthStateSvc
 
-<div class="page">
-    <div class="sidebar-overlay @(_sidebarOpen ? "visible" : "")" @onclick="CloseSidebar" aria-hidden="true"></div>
-    <div class="sidebar @(_sidebarOpen ? "show" : "")">
-        <NavMenu OnNavigationRequested="CloseSidebar" />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <button class="hamburger-btn" @onclick="ToggleSidebar"
-                    aria-label="@(_sidebarOpen ? "Cerrar menú lateral" : "Abrir menú lateral")"
-                    title="@(_sidebarOpen ? "Cerrar menú" : "Abrir menú")">
-                <i class="bi @(_sidebarOpen ? "bi-x-lg" : "bi-list")"></i>
-            </button>
-
-            <a class="topbar-mobile-brand" href="" @onclick="NavigateToDashboard" @onclick:preventDefault="true"
-               title="Ir al Dashboard" aria-label="CryptoView Dashboard">
-                <svg class="topbar-logo-svg" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z" fill="none" stroke="#FF7A00" stroke-width="3.5"
-                          stroke-linecap="round" stroke-linejoin="round" />
-                    <circle cx="60" cy="40" r="20" fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.4" />
-                    <circle cx="60" cy="40" r="14" fill="#FF7A00" />
-                    <polyline points="44,44 52,36 58,42 66,32 76,38" fill="none" stroke="#fff" stroke-width="2"
-                              stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                <span class="topbar-brand-name">CryptoView</span>
-            </a>
-
-            <div class="ms-auto d-flex align-items-center gap-3">
-                <NotificationDropdown />
-
-                <div class="profile-menu @(_profileMenuOpen ? "profile-menu--open" : "")" @onkeydown="OnProfileKeyDown">
-                    @if (_profileMenuOpen)
-                    {
-                        <div class="notif-backdrop" @onclick="CloseUserMenu" aria-hidden="true"></div>
-                    }
-
-                    <button type="button"
-                            class="profile-toggle btn btn-link text-light p-0 border-0 d-flex align-items-center gap-2"
-                            @onclick="ToggleUserMenu" @onclick:stopPropagation="true" aria-label="Menú de usuario"
-                            aria-expanded="@_profileMenuOpen.ToString().ToLower()" aria-haspopup="true">
-                        <i class="bi bi-person-circle fs-4"></i>
-                        <span class="d-none d-md-inline small">@AuthStateSvc.GetCurrentUsername()</span> <i
-                        class="profile-caret bi bi-chevron-down ms-1"></i>
-                    </button>
-
-                    <ul class="profile-dropdown" @onclick:stopPropagation="true">
-                        <li>
-                            <a class="dropdown-item" href="perfil">
-                                <i class="bi bi-person me-2"></i>Mi perfil
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="preferencias">
-                                <i class="bi bi-sliders me-2"></i>Preferencias
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="ayuda">
-                                <i class="bi bi-question-circle me-2"></i>Ayuda
-                            </a>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider profile-divider" />
-                        </li>
-                        <li>
-                            <button class="dropdown-item dropdown-item-danger border-0 bg-transparent w-100 text-start"
-                                    @onclick="HandleLogout">
-                                <i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-
-    @* ── Modal global de detalle de notificación ── *@
-    @if (NotificationSvc.SelectedNotification is { } selected)
+<CascadingValue Value="@_authInitialized" Name="AuthInitialized">
+    @if (!_authInitialized)
     {
-        <div class="notif-modal-overlay" @onclick="CloseNotificationModal" aria-hidden="true"></div>
-
-        <div class="notif-modal" role="dialog" aria-label="Detalle de notificación" aria-modal="true"
-             @onkeydown="OnModalKeyDown">
-            <div class="notif-modal-header notif-modal-type-@selected.TypeName">
-                <div class="notif-modal-icon notif-icon-@selected.TypeName">
-                    <i class="bi @selected.IconClass"></i>
+        @* ── Gate: pantalla de carga neutral mientras se valida la sesión ── *@
+        <div style="min-height:100vh; display:flex; align-items:center; justify-content:center;">
+            <div style="text-align:center;">
+                <div class="spinner-border text-warning mb-3" role="status" style="width:2.5rem; height:2.5rem;">
+                    <span class="visually-hidden">Inicializando...</span>
                 </div>
-                <h2 class="notif-modal-title">@selected.Title</h2>
-            </div>
-
-            <div class="notif-modal-body">
-                <p class="notif-modal-message">@selected.Message</p>
-                <span class="notif-modal-time">@selected.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
-            </div>
-
-            <div class="notif-modal-footer">
-                <button class="notif-modal-close-btn" @onclick="CloseNotificationModal" @onclick:stopPropagation="true"
-                        autofocus>
-                    Cerrar
-                </button>
+                <p class="text-muted">Inicializando aplicación...</p>
             </div>
         </div>
     }
-</div>
+    else
+    {
+        <div class="page">
+            <div class="sidebar-overlay @(_sidebarOpen ? "visible" : "")" @onclick="CloseSidebar" aria-hidden="true"></div>
+            <div class="sidebar @(_sidebarOpen ? "show" : "")">
+                <NavMenu OnNavigationRequested="CloseSidebar" />
+            </div>
+
+            <main>
+                <div class="top-row px-4">
+                    <button class="hamburger-btn" @onclick="ToggleSidebar"
+                            aria-label="@(_sidebarOpen ? Loc["topbar.closeSidebar"] : Loc["topbar.openSidebar"])"
+                            title="@(_sidebarOpen ? Loc["topbar.closeSidebar"] : Loc["topbar.openSidebar"])">
+                        <i class="bi @(_sidebarOpen ? "bi-x-lg" : "bi-list")"></i>
+                    </button>
+
+                    <a class="topbar-mobile-brand" href="" @onclick="NavigateToDashboard" @onclick:preventDefault="true"
+                       title="@Loc["topbar.goToDashboard"]" aria-label="CryptoView Dashboard">
+                        <svg class="topbar-logo-svg" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg"
+                             aria-hidden="true">
+                            <path d="M10,40 Q60,-10 110,40 Q60,90 10,40 Z" fill="none" stroke="#FF7A00" stroke-width="3.5"
+                                  stroke-linecap="round" stroke-linejoin="round" />
+                            <circle cx="60" cy="40" r="20" fill="none" stroke="#FF7A00" stroke-width="2.5" opacity="0.4" />
+                            <circle cx="60" cy="40" r="14" fill="#FF7A00" />
+                            <polyline points="44,44 52,36 58,42 66,32 76,38" fill="none" stroke="#fff" stroke-width="2"
+                                      stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span class="topbar-brand-name">CryptoView</span>
+                    </a>
+
+                    <div class="topbar-actions">
+                        <NotificationDropdown />
+
+                        <LangSelector />
+
+                        <div class="profile-menu @(_profileMenuOpen ? "profile-menu--open" : "")"
+                             @onkeydown="OnProfileKeyDown">
+                            @if (_profileMenuOpen)
+                            {
+                                <div class="notif-backdrop" @onclick="CloseUserMenu" aria-hidden="true"></div>
+                            }
+
+                            <button type="button"
+                                    class="profile-toggle btn btn-link text-light p-0 border-0 d-flex align-items-center gap-2"
+                                    @onclick="ToggleUserMenu" @onclick:stopPropagation="true"
+                                    aria-label="@Loc["menu.myProfile"]" aria-expanded="@_profileMenuOpen.ToString().ToLower()"
+                                    aria-haspopup="true">
+                                <i class="bi bi-person-circle fs-4"></i>
+                                <span class="small profile-username">@AuthStateSvc.GetCurrentUsername()</span> <i
+                                class="profile-caret bi bi-chevron-down ms-1"></i>
+                            </button>
+
+                            <ul class="profile-dropdown" @onclick:stopPropagation="true">
+                                <li>
+                                    <a class="dropdown-item" href="perfil" data-tutorial="nav-profile">
+                                        <i class="bi bi-person me-2"></i>@Loc["menu.myProfile"]
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="preferencias" data-tutorial="nav-preferences">
+                                        <i class="bi bi-sliders me-2"></i>@Loc["menu.preferences"]
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="ayuda" data-tutorial="nav-help">
+                                        <i class="bi bi-question-circle me-2"></i>@Loc["menu.help"]
+                                    </a>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider profile-divider" />
+                                </li>
+                                <li>
+                                    <button
+                                        class="dropdown-item dropdown-item-danger border-0 bg-transparent w-100 text-start"
+                                        @onclick="HandleLogout">
+                                        <i class="bi bi-box-arrow-right me-2"></i>@Loc["menu.logout"]
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <article class="content px-4">
+                    @Body
+                </article>
+
+                @* ── Banner: perfil incompleto (usuarios antiguos) ── *@
+                @if (_showProfileIncompleteBanner)
+                {
+                    <div class="profile-incomplete-banner">
+                        <div class="profile-incomplete-banner-content">
+                            <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+                            <span>@Loc["profile.incomplete.banner"]</span>
+                        </div>
+                        <div class="profile-incomplete-banner-actions">
+                            <a href="perfil/editar" class="btn btn-sm profile-incomplete-btn-primary"
+                               @onclick="DismissProfileBanner">
+                                @Loc["profile.incomplete.completeProfile"]
+                            </a>
+                            <button class="btn btn-sm profile-incomplete-btn-secondary" @onclick="DismissProfileBanner">
+                                @Loc["profile.incomplete.later"]
+                            </button>
+                        </div>
+                    </div>
+                }
+            </main>
+
+            <TutorialOverlay @ref="_tutorialOverlay" />
+
+            @* ── Modal global de detalle de notificación ── *@
+            @if (NotificationSvc.SelectedNotification is { } selected)
+            {
+                <div class="notif-modal-overlay" @onclick="CloseNotificationModal" aria-hidden="true"></div>
+
+                <div class="notif-modal" role="dialog" aria-label="@Loc["menu.notificationDetail"]" aria-modal="true"
+                     @onkeydown="OnModalKeyDown">
+                    <div class="notif-modal-header notif-modal-type-@selected.TypeName">
+                        <div class="notif-modal-icon notif-icon-@selected.TypeName">
+                            <i class="bi @selected.IconClass"></i>
+                        </div>
+                        <h2 class="notif-modal-title">@CryptoView.Services.NotificationService.GetDisplayTitle(selected, Loc)
+                        </h2>
+                    </div>
+
+                    <div class="notif-modal-body">
+                        <p class="notif-modal-message">@CryptoView.Services.NotificationService.GetDisplayMessage(selected, Loc)
+                        </p>
+                        <span class="notif-modal-time">@selected.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+
+                    <div class="notif-modal-footer">
+                        <button class="notif-modal-close-btn" @onclick="CloseNotificationModal" @onclick:stopPropagation="true"
+                                autofocus>
+                            @Loc["menu.close"]
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</CascadingValue>
 
 @code {
     private bool _profileMenuOpen = false;
     private bool _sidebarOpen = false;
-
-    [Inject] private CryptoView.Services.AuthStateService AuthStateSvc { get; set; } = default!;
+    private bool _langInitialized;
+    private bool _authInitialized;
+    private TutorialOverlay? _tutorialOverlay;
+    private bool _profileIncompleteChecked;
+    private bool _showProfileIncompleteBanner;
 
     private void ToggleSidebar()
     {
@@ -162,15 +216,73 @@
     protected override void OnInitialized()
     {
         NotificationSvc.OnModalChanged += HandleModalChanged;
+        Loc.OnLanguageChanged += HandleLanguageChanged;
     }
 
     public void Dispose()
     {
         NotificationSvc.OnModalChanged -= HandleModalChanged;
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
     }
 
     private void HandleModalChanged()
         => InvokeAsync(StateHasChanged);
+
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_langInitialized)
+        {
+            _langInitialized = true;
+
+            // Restaurar sesión desde localStorage
+            try
+            {
+                await Loc.InitializeAsync();
+
+                var userJson = await JS.InvokeAsync<string?>("sessionManager.getUserJson");
+                if (!string.IsNullOrEmpty(userJson))
+                {
+                    var userObj = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(userJson);
+                    var userId = userObj.TryGetProperty("id", out var idProp) ? idProp.GetInt32() : (int?)null;
+                    var username = userObj.TryGetProperty("username", out var userProp) ? userProp.GetString() : null;
+
+                    if (userId.HasValue && !string.IsNullOrWhiteSpace(username))
+                    {
+                        await AuthStateSvc.InitAuthStateAsync(userId, username);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MainLayout] Error restaurando sesión: {ex.Message}");
+            }
+
+            // [TEMP] Diagnóstico — solo estado boolean, sin datos sensibles. Eliminar antes de producción.
+            Console.WriteLine($"[Auth diagnóstico] IsAuthenticated={AuthStateSvc.IsAuthenticated()}");
+
+            if (!AuthStateSvc.IsAuthenticated())
+            {
+                Nav.NavigateTo("/login", replace: true);
+                return;
+            }
+
+            _authInitialized = true;
+            await InvokeAsync(StateHasChanged);
+
+            // Check if user profile is complete (for old users without FullName)
+            await CheckProfileCompleteness();
+
+            // Start guided tour for first-time users (after a brief delay for body to render)
+            await Task.Delay(300);
+            if (_tutorialOverlay is not null)
+            {
+                await _tutorialOverlay.TryStartTour();
+            }
+        }
+    }
 
     private void CloseNotificationModal()
     {
@@ -186,8 +298,41 @@
     private async Task HandleLogout()
     {
         _profileMenuOpen = false;
-        Console.WriteLine("Logout ejecutado");
+        _showProfileIncompleteBanner = false;
+        _profileIncompleteChecked = false;
+        AuthStateSvc.Logout();
         await JS.InvokeVoidAsync("sessionManager.logout");
-        Nav.NavigateTo("/login", forceLoad: true);
+        Nav.NavigateTo("/login", replace: true);
+    }
+
+    private void DismissProfileBanner()
+    {
+        _showProfileIncompleteBanner = false;
+        StateHasChanged();
+    }
+
+    private async Task CheckProfileCompleteness()
+    {
+        if (_profileIncompleteChecked) return;
+
+        var user = AuthStateSvc.GetCurrentUser();
+        if (user is null || user.Role == "Admin") return;
+
+        _profileIncompleteChecked = true;
+
+        try
+        {
+            var profile = await ProfileSvc.GetUserProfileAsync(user.Id);
+            var fullName = profile?.FullName;
+            if (string.IsNullOrWhiteSpace(fullName))
+            {
+                _showProfileIncompleteBanner = true;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[MainLayout] Error checking profile: {ex.Message}");
+        }
     }
 }

@@ -1,0 +1,247 @@
+@inject CryptoView.Services.TutorialService TutorialSvc
+@inject CryptoView.Services.LocalizacionService Loc
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (IsActive && CurrentTutorial is not null && CurrentStep < CurrentTutorial.Steps.Count)
+{
+    var step = CurrentTutorial.Steps[CurrentStep];
+
+    <div class="cv-tutorial-overlay" @onclick="OnOverlayClick" aria-hidden="true"></div>
+
+    @if (_spotlightRect is not null && !string.IsNullOrEmpty(step.TargetSelector))
+    {
+        <div class="cv-tutorial-spotlight" style="
+        top: @_spotlightRect.Toppx;
+        left: @_spotlightRect.Leftpx;
+        width: @_spotlightRect.Widthpx;
+        height: @_spotlightRect.Heightpx;
+        "></div>
+    }
+
+    <TutorialTooltip Step="step" CurrentStep="CurrentStep" TotalSteps="CurrentTutorial.Steps.Count" IsMobile="_isMobile"
+                     OnGotItClicked="GotIt" OnSkipClicked="SkipTour" />
+}
+
+<style>
+    .cv-tutorial-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 10000;
+        animation: cvOverlayFadeIn 0.2s ease-out;
+    }
+
+    @@keyframes cvOverlayFadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    .cv-tutorial-spotlight {
+        position: fixed;
+        z-index: 10000;
+        border: 2px solid var(--accent, #FF7A00);
+        border-radius: var(--radius-md, 12px);
+        box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.55);
+        pointer-events: none;
+        transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+</style>
+
+@code {
+    private bool IsActive;
+    private CryptoView.Models.TutorialDefinition? CurrentTutorial;
+    private int CurrentStep;
+    private bool _isMobile;
+    private SpotRect? _spotlightRect;
+    private string? _currentRoute;
+
+    public bool IsTourActive => IsActive;
+
+    private const int MaxRetries = 5;
+    private const int RetryDelayMs = 250;
+    private const int NavigationWaitMs = 400;
+
+    protected override void OnInitialized()
+    {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+        Nav.LocationChanged += HandleLocationChanged;
+    }
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
+        Nav.LocationChanged -= HandleLocationChanged;
+    }
+
+    private void HandleLanguageChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _currentRoute = new Uri(e.Location).AbsolutePath;
+    }
+
+    /// <summary>
+    /// Starts the guided tour. Called from MainLayout after auth initialization.
+    /// </summary>
+    public async Task StartTour(string tourId = "main-tour")
+    {
+        var tutorial = TutorialSvc.GetTutorial(tourId);
+        if (tutorial is null) return;
+
+        CurrentTutorial = tutorial;
+        CurrentStep = 0;
+        IsActive = true;
+        _currentRoute = new Uri(Nav.Uri).AbsolutePath;
+
+        await UpdateViewport();
+        await ShowCurrentStep();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Checks if the tour should be shown and starts it if needed.
+    /// </summary>
+    public async Task<bool> TryStartTour(string tourId = "main-tour")
+    {
+        if (await TutorialSvc.ShouldShowAsync(tourId))
+        {
+            await StartTour(tourId);
+            return true;
+        }
+        return false;
+    }
+
+    private async Task GotIt()
+    {
+        if (CurrentTutorial is null) return;
+
+        CurrentStep++;
+
+        // Tour finished
+        if (CurrentStep >= CurrentTutorial.Steps.Count)
+        {
+            await TutorialSvc.MarkAsSeenAsync(CurrentTutorial.Id);
+            CloseTour();
+            return;
+        }
+
+        // Navigate if needed
+        var nextStep = CurrentTutorial.Steps[CurrentStep];
+        if (!string.IsNullOrEmpty(nextStep.Route) && nextStep.Route != _currentRoute)
+        {
+            Nav.NavigateTo(nextStep.Route, forceLoad: false);
+            await Task.Delay(NavigationWaitMs);
+        }
+
+        await ShowCurrentStep();
+        StateHasChanged();
+    }
+
+    private async Task SkipTour()
+    {
+        if (CurrentTutorial is null) return;
+        await TutorialSvc.MarkAsSeenAsync(CurrentTutorial.Id);
+        CloseTour();
+    }
+
+    private void CloseTour()
+    {
+        IsActive = false;
+        CurrentTutorial = null;
+        CurrentStep = 0;
+        _spotlightRect = null;
+        StateHasChanged();
+    }
+
+    private void OnOverlayClick()
+    {
+        _ = SkipTour();
+    }
+
+    private async Task ShowCurrentStep()
+    {
+        if (CurrentTutorial is null || CurrentStep >= CurrentTutorial.Steps.Count) return;
+
+        var step = CurrentTutorial.Steps[CurrentStep];
+        await UpdateViewport();
+
+        // No target → centered tooltip (welcome, finish)
+        if (string.IsNullOrEmpty(step.TargetSelector))
+        {
+            _spotlightRect = null;
+            return;
+        }
+
+        // On mobile: no spotlight for nav items, just centered tooltip
+        if (_isMobile)
+        {
+            _spotlightRect = null;
+            return;
+        }
+
+        // Find target with retries
+        SpotRect? rect = null;
+        for (int i = 0; i < MaxRetries; i++)
+        {
+            rect = await FindVisibleTarget(step.TargetSelector);
+            if (rect is not null) break;
+            await Task.Delay(RetryDelayMs);
+        }
+
+        _spotlightRect = rect;
+    }
+
+    private async Task<SpotRect?> FindVisibleTarget(string selector)
+    {
+        try
+        {
+            var rect = await JS.InvokeAsync<SpotRect?>("tutorialStorage.getTargetRect", selector);
+            if (rect is not null && rect.Width > 0 && rect.Height > 0
+                && rect.Bottom > 0 && rect.Right > 0)
+                return rect;
+        }
+        catch { /* element not found */ }
+        return null;
+    }
+
+    private async Task UpdateViewport()
+    {
+        try
+        {
+            var vp = await JS.InvokeAsync<ViewportInfo>("tutorialStorage.getViewport");
+            _isMobile = vp.IsMobile;
+        }
+        catch { _isMobile = false; }
+    }
+
+    private class ViewportInfo
+    {
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public bool IsMobile { get; set; }
+    }
+
+    private class SpotRect
+    {
+        public double Top { get; set; }
+        public double Left { get; set; }
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public double Bottom { get; set; }
+        public double Right { get; set; }
+        public string Toppx => $"{Top}px";
+        public string Leftpx => $"{Left}px";
+        public string Widthpx => $"{Width}px";
+        public string Heightpx => $"{Height}px";
+    }
+}

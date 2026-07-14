@@ -1,19 +1,21 @@
 ﻿@page "/stats"
 @inject CryptoApiService ApiService
+@inject CryptoView.Services.LocalizacionService Loc
 @using Microsoft.EntityFrameworkCore
 @inject CryptoDbContext DbContext
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
-<PageTitle>Estadísticas - CryptoView</PageTitle>
+<PageTitle>@Loc["stats.pageTitle"]</PageTitle>
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.FavoriteCryptoService FavoriteCryptoSvc
 @inject NavigationManager Nav
 
 <div class="page-container stats-container stats-page printable-report">
     <!-- Header -->
     <div class="page-header mb-4">
-        <h1 class="display-5 fw-bold text-warning mb-1">Estadísticas de Criptomonedas</h1>
-        <p class="lead text-light mb-0">Comparación y análisis estadístico de criptomonedas</p>
+        <h1 class="display-5 fw-bold text-warning mb-1">@Loc["stats.h1.title"]</h1>
+        <p class="lead text-light mb-0">@Loc["stats.h1.subtitle"]</p>
     </div>
 
     <!-- Panel de comparación (siempre visible) -->
@@ -21,1112 +23,1147 @@
         <div class="comparison-panel-header">
             <div>
                 <h4 class="text-warning mb-1">
-                    <i class="bi bi-bar-chart-steps"></i> Selección de monedas para comparar
+                    <i class="bi bi-bar-chart-steps"></i> @Loc["stats.comparison.panel.title"]
                 </h4>
-                <p class="text-muted small mb-0">Seleccioná 2 o más monedas y un período para comparar precios.</p>
+                <p class="text-muted small mb-0">@Loc["stats.comparison.panel.subtitle"]</p>
             </div>
         </div>
         <div class="comparison-panel-body">
             <div class="coin-chips-container mb-3" role="group" aria-label="Monedas disponibles para comparar">
-                @foreach (var coin in GetAvailableComparisonCoins())
-                {
-                    var sym = coin.Symbol;
-                    var coinName = coin.Name;
-                    var isChipSelected = selectedCoins.Contains(sym);
-                    var ariaPressed = isChipSelected ? "true" : "false";
-                    var chipClass = isChipSelected ? "coin-chip selected" : "coin-chip";
-                    <button class="@chipClass" @onclick="() => ToggleCoinSelection(sym)" aria-pressed="@ariaPressed"
-                            aria-label="@coinName">
-                        <span class="coin-chip-symbol">@sym</span>
-                        <span class="coin-chip-name">@coinName</span>
-                    </button>
+                @{
+                    var availableCoins = GetAvailableComparisonCoins().ToList();
                 }
-            </div>
-            <!-- Período de análisis (MOBILE) -->
-            <div class="period-block d-md-none mb-4">
-                <div class="period-block-title">📅 Período de análisis</div>
-                <div class="filter-group">
-                    <label class="period-label">Fecha inicial</label>
-                    <div class="cv-datepicker-wrap">
-                        <input class="filter-input" id="fp-compareFrom" placeholder="dd/MM/yyyy"
-                               aria-label="Fecha inicial" />
-                        <i class="bi bi-calendar3 cv-datepicker-icon"></i>
+                @if (!availableCoins.Any())
+                {
+                    <div class="stats-empty-state py-3">
+                        <div class="stats-empty-icon"><i class="bi bi-plus-circle"></i></div>
+                        <p class="stats-empty-title">@Loc["stats.comparison.empty"]</p>
+                        <p class="stats-empty-sub">@((MarkupString)Loc["stats.comparison.empty.link"])</p>
                     </div>
-                    <span id="fp-compareFrom-error" class="cv-date-error"></span>
-                </div>
-                <div class="filter-group">
-                    <label class="period-label">Fecha final</label>
-                    <div class="cv-datepicker-wrap">
-                        <input class="filter-input" id="fp-compareTo" placeholder="dd/MM/yyyy"
-                               aria-label="Fecha final" />
-                        <i class="bi bi-calendar3 cv-datepicker-icon"></i>
-                    </div>
-                    <span id="fp-compareTo-error" class="cv-date-error"></span>
-                </div>
-                <button class="comparison-btn-compare w-100 mt-1" @onclick="OnCompareClicked" disabled="@isComparing"
-                        aria-label="Comparar monedas seleccionadas">
-                    @if (isComparing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                        @:Comparando...
+                }
+                else if (availableCoins.Count == 1)
+                {
+                    var singleCoin = availableCoins[0];
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button class="coin-chip selected" disabled>
+                            <span class="coin-chip-symbol">@singleCoin.Symbol</span>
+                            <span class="coin-chip-name">@singleCoin.Name</span>
+                        </button>
+                        <span class="text-muted small"><i class="bi bi-info-circle"></i>
+                            @Loc["stats.comparison.singleCoin"]</span>
+                        </div>
                     }
-                    else
+                else
                     {
-                        <i class="bi bi-bar-chart"></i>@: Comparar
+                        @foreach (var coin in availableCoins)
+                        {
+                            var sym = coin.Symbol;
+                            var coinName = coin.Name;
+                            var isChipSelected = selectedCoins.Contains(sym);
+                            var ariaPressed = isChipSelected ? "true" : "false";
+                            var chipClass = isChipSelected ? "coin-chip selected" : "coin-chip";
+                            <button class="@chipClass" @onclick="() => ToggleCoinSelection(sym)" aria-pressed="@ariaPressed"
+                                    aria-label="@coinName">
+                                <span class="coin-chip-symbol">@sym</span>
+                                <span class="coin-chip-name">@coinName</span>
+                            </button>
+                        }
                     }
-                </button>
-            </div>
-
-            <!-- Período de análisis (DESKTOP) -->
-            <div class="comparison-period-row d-none d-md-flex flex-wrap align-items-end gap-3 mb-3">
-                <span class="comparison-row-label">Período</span>
-                <div class="filter-group">
-                    <label class="filter-label">Desde</label>
-                    <div class="cv-datepicker-wrap">
-                        <input class="filter-input" id="fp-compareFrom-desktop" placeholder="dd/MM/yyyy"
-                               aria-label="Fecha desde" />
-                        <i class="bi bi-calendar3 cv-datepicker-icon"></i>
-                    </div>
-                    <span id="fp-compareFrom-desktop-error" class="cv-date-error"></span>
                 </div>
-                <div class="filter-group">
-                    <label class="filter-label">Hasta</label>
-                    <div class="cv-datepicker-wrap">
-                        <input class="filter-input" id="fp-compareTo-desktop" placeholder="dd/MM/yyyy"
-                               aria-label="Fecha hasta" />
-                        <i class="bi bi-calendar3 cv-datepicker-icon"></i>
+                <!-- Período de análisis (MOBILE) -->
+                <div class="period-block d-md-none mb-4">
+                    <div class="period-block-title">@Loc["stats.period.mobile.title"]</div>
+                    <div class="filter-group">
+                        <label class="period-label">@Loc["stats.period.from"]</label>
+                        <div class="cv-datepicker-wrap">
+                            <input class="filter-input" id="fp-compareFrom" placeholder="dd/MM/yyyy"
+                                   aria-label="@Loc["stats.startDate"]" />
+                            <i class="bi bi-calendar3 cv-datepicker-icon"></i>
+                        </div>
+                        <span id="fp-compareFrom-error" class="cv-date-error"></span>
                     </div>
-                    <span id="fp-compareTo-desktop-error" class="cv-date-error"></span>
-                </div>
-            </div>
-            <div class="comparison-actions">
-                <div class="comparison-actions-right">
-                    <button class="comparison-btn-clear" @onclick="ClearComparison" aria-label="Limpiar selección">
-                        <i class="bi bi-x-circle"></i> Limpiar
-                    </button>
-                    <button class="comparison-btn-compare" @onclick="OnCompareClicked" disabled="@isComparing"
+                    <div class="filter-group">
+                        <label class="period-label">@Loc["stats.period.to"]</label>
+                        <div class="cv-datepicker-wrap">
+                            <input class="filter-input" id="fp-compareTo" placeholder="dd/MM/yyyy"
+                                   aria-label="@Loc["stats.endDate"]" />
+                            <i class="bi bi-calendar3 cv-datepicker-icon"></i>
+                        </div>
+                        <span id="fp-compareTo-error" class="cv-date-error"></span>
+                    </div>
+                    <button class="comparison-btn-compare w-100 mt-1" @onclick="OnCompareClicked" disabled="@isComparing"
                             aria-label="Comparar monedas seleccionadas">
                         @if (isComparing)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                            @:Comparando...
+                            @Loc["stats.btn.comparing"]
                         }
                         else
                         {
-                            <i class="bi bi-bar-chart-steps"></i>
-                            @:Comparar
+                            <i class="bi bi-bar-chart"></i>
+                            @Loc["stats.btn.compare"]
                         }
                     </button>
-                    @if (hasCompared && !lineChartEmpty)
-                    {
-                        <button class="cv-download-chart-btn"
-                                @onclick='async () => await JSRuntime.InvokeVoidAsync("cvDownloadChart", "lineChart", "comparacion-cryptoview.png")'
-                                title="Descargar gráfico como PNG">
-                            <i class="bi bi-download"></i> Descargar
-                        </button>
-                    }
                 </div>
-            </div>
-        </div>
-    </div>
 
-    @if (filterError != null)
-    {
-        <div class="filter-error mt-2 mb-3">
-            <i class="bi bi-exclamation-circle"></i> @filterError
-        </div>
-    }
-
-    @if (coinWarnings.Any())
-    {
-        <div class="mt-2 mb-3">
-            @foreach (var kv in coinWarnings)
-            {
-                <div class="alert alert-warning py-2 px-3 mb-1 d-flex align-items-center gap-2" style="font-size:.88rem;">
-                    <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-                    <span><strong>@kv.Key</strong>: @kv.Value</span>
-                </div>
-            }
-        </div>
-    }
-
-    @if (isLoading)
-    {
-        <div class="text-center py-5">
-            <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Cargando...</span>
-            </div>
-            <p class="mt-3 text-light">Cargando datos...</p>
-        </div>
-    }
-    else
-    {
-        <!-- chart content below -->
-    }
-
-    <div class="stats-sections @(!isLoading ? "" : "d-none")">
-        <!-- Analytics Cards: precio inicial, final, máx, mín, variación %, vol. promedio -->
-        @if (showLineChart && analyticsInitialPrice.HasValue)
-        {
-            <div class="row analytics-cards-row">
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="analytics-card stats-card">
-                        <span class="analytics-label">Precio inicial</span>
-                        <span class="analytics-value">@FormatPrice(analyticsInitialPrice.Value)</span>
-                    </div>
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="analytics-card stats-card">
-                        <span class="analytics-label">Precio final</span>
-                        <span class="analytics-value">@FormatPrice(analyticsFinalPrice!.Value)</span>
-                    </div>
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="analytics-card stats-card">
-                        <span class="analytics-label">Máximo del período</span>
-                        <span class="analytics-value analytics-up">@FormatPrice(analyticsMaxPrice!.Value)</span>
-                    </div>
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="analytics-card stats-card">
-                        <span class="analytics-label">Mínimo del período</span>
-                        <span class="analytics-value analytics-down">@FormatPrice(analyticsMinPrice!.Value)</span>
-                    </div>
-                </div>
-                <div class="col-6 col-md-4 col-xl-2">
-                    <div class="analytics-card stats-card">
-                        <span class="analytics-label">Variación %</span>
-                        <span class="analytics-value @(analyticsPctChange >= 0 ? "analytics-up" : "analytics-down")">
-                            @(analyticsPctChange >= 0 ? "+" : "")@analyticsPctChange!.Value.ToString("F2")%
-                        </span>
-                    </div>
-                </div>
-                @if (analyticsAvgVolume.HasValue)
-                {
-                    <div class="col-6 col-md-4 col-xl-2">
-                        <div class="analytics-card stats-card">
-                            <span class="analytics-label">Vol. promedio</span>
-                            <span class="analytics-value">$@FormatLargeNumber(analyticsAvgVolume.Value)</span>
+                <!-- Período de análisis (DESKTOP) -->
+                <div class="comparison-period-row d-none d-md-flex flex-wrap align-items-end gap-3 mb-3">
+                    <span class="comparison-row-label">@Loc["stats.period.desktop.period"]</span>
+                    <div class="filter-group">
+                        <label class="filter-label">@Loc["stats.period.desktop.from"]</label>
+                        <div class="cv-datepicker-wrap">
+                            <input class="filter-input" id="fp-compareFrom-desktop" placeholder="dd/MM/yyyy"
+                                   aria-label="@Loc["stats.dateFromAria"]" />
+                            <i class="bi bi-calendar3 cv-datepicker-icon"></i>
                         </div>
+                        <span id="fp-compareFrom-desktop-error" class="cv-date-error"></span>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">@Loc["stats.period.desktop.to"]</label>
+                        <div class="cv-datepicker-wrap">
+                            <input class="filter-input" id="fp-compareTo-desktop" placeholder="dd/MM/yyyy"
+                                   aria-label="@Loc["stats.dateToAria"]" />
+                            <i class="bi bi-calendar3 cv-datepicker-icon"></i>
+                        </div>
+                        <span id="fp-compareTo-desktop-error" class="cv-date-error"></span>
+                    </div>
+                </div>
+                <div class="comparison-actions">
+                    <div class="comparison-actions-right">
+                        <button class="comparison-btn-clear" @onclick="ClearComparison" aria-label="Limpiar selección">
+                            <i class="bi bi-x-circle"></i> @Loc["stats.btn.clear"]
+                        </button>
+                        <button class="comparison-btn-compare" @onclick="OnCompareClicked" disabled="@isComparing"
+                                aria-label="Comparar monedas seleccionadas">
+                            @if (isComparing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                @Loc["stats.btn.comparing"]
+                            }
+                            else
+                            {
+                                <i class="bi bi-bar-chart-steps"></i>
+                                @Loc["stats.btn.compare"]
+                            }
+                        </button>
+                        @if (hasCompared && !lineChartEmpty)
+                        {
+                            <button class="cv-download-chart-btn"
+                                    @onclick='async () => await JSRuntime.InvokeVoidAsync("cvDownloadChart", "lineChart", "comparacion-cryptoview.png")'
+                                    title="@Loc["stats.btn.download.title"]">
+                                <i class="bi bi-download"></i> @Loc["stats.btn.download"]
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (filterError != null)
+        {
+            <div class="filter-error mt-2 mb-3">
+                <i class="bi bi-exclamation-circle"></i> @filterError
+            </div>
+        }
+
+        @if (coinWarnings.Any())
+        {
+            <div class="mt-2 mb-3">
+                @foreach (var kv in coinWarnings)
+                {
+                    <div class="alert alert-warning py-2 px-3 mb-1 d-flex align-items-center gap-2" style="font-size:.88rem;">
+                        <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+                        <span><strong>@kv.Key</strong>: @kv.Value</span>
                     </div>
                 }
             </div>
         }
 
-        <div class="row">
-            <div class="col-12">
-                <div
-                    class="chart-card stats-card chart-fade-anim @(hasCompared ? "cv-comparison-card" : "") cv-main-chart-card">
-                    <div class="chart-header">
-                        <div>
-                            <h3 class="text-warning">
-                                <i class="bi bi-graph-up"></i> @lineChartTitle
-                            </h3>
-                            <p class="text-muted mb-0">@lineChartSubtitle</p>
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">@Loc["stats.loading.hidden"]</span>
+                </div>
+                <p class="mt-3 text-light">@Loc["stats.loading"]</p>
+            </div>
+        }
+        else
+        {
+            <!-- chart content below -->
+        }
+
+        <div class="stats-sections @(!isLoading ? "" : "d-none")">
+            <!-- Analytics Cards: precio inicial, final, máx, mín, variación %, vol. promedio -->
+            @if (showLineChart && analyticsInitialPrice.HasValue)
+            {
+                <div class="row analytics-cards-row">
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="analytics-card stats-card">
+                            <span class="analytics-label">@Loc["stats.analytics.initialPrice"]</span>
+                            <span class="analytics-value">@FormatPrice(analyticsInitialPrice.Value)</span>
                         </div>
-                        @if (hasCompared && selectedCoins.Count >= 1 && !lineChartEmpty)
-                        {
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                @if (selectedCoins.Count >= 2)
-                                {
-                                    <div class="chart-mode-toggle">
-                                        <button class="chart-mode-btn @(chartMode == "percent" ? "active" : "")"
-                                                @onclick='() => SwitchChartMode("percent")'>
-                                            <i class="bi bi-percent"></i> Rendimiento
-                                        </button>
-                                        <button class="chart-mode-btn @(chartMode == "price" ? "active" : "")"
-                                                @onclick='() => SwitchChartMode("price")'>
-                                            <i class="bi bi-currency-dollar"></i> Precio USD
-                                        </button>
-                                    </div>
-                                }
-                                <button class="cv-reset-zoom-btn"
-                                        @onclick='async () => await JSRuntime.InvokeVoidAsync("cvResetZoom", "lineChart")'
-                                        title="Restablecer zoom al estado inicial">
-                                    <i class="bi bi-arrows-fullscreen"></i> Reset zoom
-                                </button>
-                            </div>
-                        }
                     </div>
-                    <div class="chart-wrapper">
-                        <canvas id="lineChart" style="@(showLineChart ? "" : "display:none;")"></canvas>
-                        @if (!showLineChart && chartApiError != null)
-                        {
-                            <div class="stats-empty-state">
-                                <div class="stats-empty-icon"><i class="bi bi-wifi-off"></i></div>
-                                <p class="stats-empty-title">Error al consultar CoinGecko</p>
-                                <p class="stats-empty-sub">@chartApiError</p>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="analytics-card stats-card">
+                            <span class="analytics-label">@Loc["stats.analytics.finalPrice"]</span>
+                            <span class="analytics-value">@FormatPrice(analyticsFinalPrice!.Value)</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="analytics-card stats-card">
+                            <span class="analytics-label">@Loc["stats.analytics.maxPrice"]</span>
+                            <span class="analytics-value analytics-up">@FormatPrice(analyticsMaxPrice!.Value)</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="analytics-card stats-card">
+                            <span class="analytics-label">@Loc["stats.analytics.minPrice"]</span>
+                            <span class="analytics-value analytics-down">@FormatPrice(analyticsMinPrice!.Value)</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="analytics-card stats-card">
+                            <span class="analytics-label">@Loc["stats.analytics.variation"]</span>
+                            <span class="analytics-value @(analyticsPctChange >= 0 ? "analytics-up" : "analytics-down")">
+                                @(analyticsPctChange >= 0 ? "+" : "")@analyticsPctChange!.Value.ToString("F2")%
+                            </span>
+                        </div>
+                    </div>
+                    @if (analyticsAvgVolume.HasValue)
+                    {
+                        <div class="col-6 col-md-4 col-xl-2">
+                            <div class="analytics-card stats-card">
+                                <span class="analytics-label">@Loc["stats.analytics.avgVolume"]</span>
+                                <span class="analytics-value">$@FormatLargeNumber(analyticsAvgVolume.Value)</span>
                             </div>
-                        }
-                        else if (!showLineChart && lineChartEmpty)
-                        {
-                            <div class="stats-empty-state">
-                                <div class="stats-empty-icon"><i class="bi bi-calendar-x"></i></div>
-                                <p class="stats-empty-title">Sin datos en ese rango</p>
-                                <p class="stats-empty-sub">No hay datos disponibles para la moneda y fechas seleccionadas.
-                                    Probá con otro rango.</p>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="row">
+                <div class="col-12">
+                    <div
+                        class="chart-card stats-card chart-fade-anim @(hasCompared ? "cv-comparison-card" : "") cv-main-chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <h3 class="text-warning">
+                                    <i class="bi bi-graph-up"></i> @lineChartTitle
+                                </h3>
+                                <p class="text-muted mb-0">@lineChartSubtitle</p>
+                            </div>
+                            @if (hasCompared && selectedCoins.Count >= 1 && !lineChartEmpty)
+                            {
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    @if (selectedCoins.Count >= 2)
+                                    {
+                                        <div class="chart-mode-toggle">
+                                            <button class="chart-mode-btn @(chartMode == "percent" ? "active" : "")"
+                                                    @onclick='() => SwitchChartMode("percent")'>
+                                                <i class="bi bi-percent"></i> @Loc["stats.btn.performance"]
+                                            </button>
+                                            <button class="chart-mode-btn @(chartMode == "price" ? "active" : "")"
+                                                    @onclick='() => SwitchChartMode("price")'>
+                                                <i class="bi bi-currency-dollar"></i> @Loc["stats.btn.priceUSD"]
+                                            </button>
+                                        </div>
+                                    }
+                                    <button class="cv-reset-zoom-btn"
+                                            @onclick='async () => await JSRuntime.InvokeVoidAsync("cvResetZoom", "lineChart")'
+                                            title="@Loc["stats.btn.resetZoom.title"]">
+                                        <i class="bi bi-arrows-fullscreen"></i> @Loc["stats.btn.resetZoom"]
+                                    </button>
                                 </div>
                             }
-                        else if (!showLineChart && selectedCoins.Count > 0 && !hasCompared)
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="lineChart" style="@(showLineChart ? "" : "display:none;")"></canvas>
+                            @if (!showLineChart && chartApiError != null)
+                            {
+                                <div class="stats-empty-state">
+                                    <div class="stats-empty-icon"><i class="bi bi-wifi-off"></i></div>
+                                    <p class="stats-empty-title">@Loc["stats.chart.error"]</p>
+                                    <p class="stats-empty-sub">@chartApiError</p>
+                                </div>
+                            }
+                            else if (!showLineChart && lineChartEmpty)
+                            {
+                                <div class="stats-empty-state">
+                                    <div class="stats-empty-icon"><i class="bi bi-calendar-x"></i></div>
+                                    <p class="stats-empty-title">@Loc["stats.chart.noData"]</p>
+                                    <p class="stats-empty-sub">@Loc["stats.chart.noDataSub"]</p>
+                                </div>
+                            }
+                            else if (!showLineChart && selectedCoins.Count > 0 && !hasCompared)
                             {
                                 <div class="stats-empty-state">
                                     <div class="stats-empty-icon"><i class="bi bi-bar-chart-steps"></i></div>
-                                    <p class="stats-empty-title">@selectedCoins.Count moneda@(selectedCoins.Count == 1 ? "" :
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              "s") seleccionada@(selectedCoins.Count == 1 ? "" : "s")</p>
-                                        <p class="stats-empty-sub">Completá el período y presioná Comparar.</p>
+                                    <p class="stats-empty-title">@Loc.Format("stats.chart.coinsSelected", selectedCoins.Count)
+                                    </p>
+                                    <p class="stats-empty-sub">@Loc["stats.chart.compareInstructions"]</p>
+                                </div>
+                            }
+                            else if (!showLineChart)
+                            {
+                                <div class="stats-empty-state">
+                                    <div class="stats-empty-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                                    <p class="stats-empty-title">@Loc["stats.chart.compareStart"]</p>
+                                    <p class="stats-empty-sub">@Loc["stats.chart.compareStartSub"]</p>
+                                </div>
+                            }
+                        </div>
+                        @if (showLineChart)
+                        {
+                            <p class="chart-caption px-2">
+                                @if (hasCompared && selectedCoins.Count > 1)
+                                {
+                                    <span>@((MarkupString)Loc.Format("stats.chart.captionCompare", selectedCoins.Count))</span>
+                                }
+                                else
+                                {
+                                    <span>@((MarkupString)Loc["stats.chart.captionSingle"])</span>
+                                }
+                            </p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ Wide Stats Cards — Power BI Style ═══ -->
+            <div class="stats-info-section">
+
+                <!-- 1. Interpretación educativa -->
+                <div class="stats-wide-card stats-card">
+                    <h3><i class="bi bi-info-circle"></i> @Loc["stats.section.edu"]</h3>
+                    <div class="stats-explain-grid">
+                        <div class="stats-explain-item">
+                            <strong>@Loc["stats.section.edu.mean"]</strong> @Loc["stats.section.edu.meanDesc"]
+                        </div>
+                        <div class="stats-explain-item">
+                            <strong>@Loc["stats.section.edu.median"]</strong> @Loc["stats.section.edu.medianDesc"]
+                        </div>
+                        <div class="stats-explain-item">
+                            <strong>@Loc["stats.section.edu.stdDev"]</strong> @Loc["stats.section.edu.stdDevDesc"]
+                        </div>
+                        <div class="stats-explain-item">
+                            <strong>@Loc["stats.section.edu.volume"]</strong> @Loc["stats.section.edu.volumeDesc"]
+                        </div>
+                        <div class="stats-explain-item">
+                            <strong>@Loc["stats.section.edu.marketCap"]</strong> @Loc["stats.section.edu.marketCapDesc"]
+                        </div>
+                        <div class="stats-explain-item">
+                            <strong>@Loc["stats.section.edu.change"]</strong> @Loc["stats.section.edu.changeDesc"]
+                        </div>
+                    </div>
+                    <p class="text-warning mt-3 mb-0">
+                        @((MarkupString)Loc["stats.section.edu.note"])
+                    </p>
+                </div>
+
+                <!-- 2. Resumen comparativo -->
+                <div class="stats-wide-card stats-card">
+                    <h3><i class="bi bi-bar-chart-steps"></i> @Loc["stats.section.compare"]</h3>
+                    <div class="stats-metrics-grid">
+                        <div class="stats-metric-item">
+                            <span class="stats-metric-label">@Loc["stats.section.compare.total"]</span>
+                            <span class="stats-metric-value">@(hasCompared ? selectedCoins.Count : cryptos.Count)</span>
+                        </div>
+                        <div class="stats-metric-item">
+                            <span class="stats-metric-label">@Loc["stats.section.compare.topGainer"]</span>
+                            <span class="stats-metric-value analytics-up">@GetStatsTopGainer()</span>
+                        </div>
+                        <div class="stats-metric-item">
+                            <span class="stats-metric-label">@Loc["stats.section.compare.topLoser"]</span>
+                            <span class="stats-metric-value analytics-down">@GetStatsTopLoser()</span>
+                        </div>
+                        <div class="stats-metric-item">
+                            <span class="stats-metric-label">@Loc["stats.section.compare.bestAvg"]</span>
+                            <span class="stats-metric-value analytics-up">@GetStatsBestAvg()</span>
+                        </div>
+                        <div class="stats-metric-item">
+                            <span class="stats-metric-label">@Loc["stats.section.compare.worstAvg"]</span>
+                            <span class="stats-metric-value analytics-down">@GetStatsWorstAvg()</span>
+                        </div>
+                        <div class="stats-metric-item">
+                            <span class="stats-metric-label">@Loc["stats.section.compare.avgChange"]</span>
+                            <span class="stats-metric-value">@((cryptos.Any() ? cryptos.Average(c => c.Change24h) :
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        0).ToString("F2"))%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Análisis estadístico -->
+                    <div class="stats-wide-card stats-card">
+                        <h3><i class="bi bi-calculator"></i> @Loc["stats.section.stat"]</h3>
+                        @{
+                            var statsForDisplay = GetStatsForDisplay();
+                        }
+                        @if (statsForDisplay.Any())
+                        {
+                            <div class="stats-metrics-grid">
+                                @foreach (var metric in statsForDisplay)
+                                {
+                                    <div class="stats-metric-item">
+                                        <span class="stats-metric-label">@metric.Label</span>
+                                        <span class="stats-metric-value @metric.ValueClass">@metric.Value</span>
                                     </div>
                                 }
-                        else if (!showLineChart)
+                            </div>
+                            @if (hasCompared && selectedCoins.Count > 1)
+                            {
+                                <p class="stats-note mt-3">
+                                    <i class="bi bi-info-circle"></i>
+                                    @Loc.Format("stats.section.stat.note", selectedCoins.Count)
+                                </p>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">@Loc["stats.section.stat.empty"]</p>
+                        }
+                    </div>
+
+
+                </div>
+
+                <!-- Portfolio Analysis -->
+                @if (cryptos.Any())
+                {
+                    <div class="row">
+                        <div class="col-md-6">
+                            @if (pieKpiMode && hasCompared)
+                            {
+                                var kpiSym = selectedCoins.FirstOrDefault() ?? "";
+                                decimal kpiToday = 0m, kpiYesterday = 0m;
+                                if (marketCapData.TryGetValue(kpiSym, out var kpiMc))
                                 {
-                                    <div class="stats-empty-state">
-                                        <div class="stats-empty-icon"><i class="bi bi-graph-up-arrow"></i></div>
-                                        <p class="stats-empty-title">Compará criptomonedas</p>
-                                        <p class="stats-empty-sub">Seleccioná 2 o más monedas, completá el período y presioná
-                                            Comparar.</p>
+                                    kpiToday = kpiMc.Today;
+                                    kpiYesterday = kpiMc.Yesterday;
+                                }
+                                var kpiChangePct = kpiToday > 0 && kpiYesterday > 0
+                                    ? (kpiToday - kpiYesterday) / kpiYesterday * 100m : 0m;
+                                var kpiCoinName = GetAvailableComparisonCoins()
+                                    .Where(c => c.Symbol.Equals(kpiSym, StringComparison.OrdinalIgnoreCase))
+                                    .Select(c => c.Name).FirstOrDefault() ?? kpiSym;
+                                var kpiDirectionClass = kpiChangePct >= 0 ? "kpi-up" : "kpi-down";
+                                var kpiCircleIcon = kpiChangePct >= 0 ? "bi-arrow-up-circle-fill" : "bi-arrow-down-circle-fill";
+                                var kpiBadgeClass = kpiChangePct >= 0 ? "badge-up" : "badge-down";
+                                var kpiArrowIcon = kpiChangePct >= 0 ? "bi-arrow-up" : "bi-arrow-down";
+                                <div class="chart-card stats-card d-flex flex-column">
+                                    <div class="chart-header">
+                                        <h3 class="text-warning">
+                                            <i class="bi bi-bar-chart"></i> Market Cap — @kpiCoinName
+                                        </h3>
+                                        <p class="text-muted mb-0">Selecció 2 o más monedas para ver la distribución comparativa.
+                                        </p>
+                                    </div>
+                                    <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 gap-3 py-3">
+                                        <div class="kpi-row">
+                                            <div class="kpi-card kpi-today stats-card">
+                                                <span class="kpi-label">@Loc["stats.kpi.today"]</span>
+                                                <span class="kpi-value">$@FormatLargeNumber(kpiToday)</span>
+                                            </div>
+                                            <div class="kpi-arrow @kpiDirectionClass">
+                                                <i class="bi @kpiCircleIcon"></i>
+                                            </div>
+                                            <div class="kpi-card kpi-yesterday stats-card">
+                                                <span class="kpi-label">@Loc["stats.kpi.yesterday"]</span>
+                                                <span class="kpi-value">$@FormatLargeNumber(kpiYesterday)</span>
+                                            </div>
                                         </div>
-                                    }
+                                        <div class="kpi-change-badge @kpiBadgeClass">
+                                            <i class="bi @kpiArrowIcon"></i>
+                                            @Math.Abs(kpiChangePct).ToString("F2")%
+                                        </div>
+                                        <p class="text-muted small text-center mb-0">
+                                            <i class="bi bi-info-circle"></i>
+                                            @Loc["stats.kpi.info"]
+                                        </p>
+                                    </div>
                                 </div>
-                                @if (showLineChart)
-                                {
-                                    <p class="chart-caption px-2">
-                                        @if (hasCompared && selectedCoins.Count > 1)
-                                        {
-                                            <span>Este gráfico facilita la <strong>comparación visual</strong> del comportamiento de
-                                                <strong>@selectedCoins.Count criptomonedas</strong> a lo largo del tiempo.</span>
-                                            }
+                            }
                             else
+                            {
+                                <div class="chart-card stats-card">
+                                    <div class="chart-header">
+                                        <h3 class="text-warning">
+                                            <i class="bi bi-pie-chart"></i> @Loc["stats.chart.pieTitle"]
+                                        </h3>
+                                        <p class="text-muted mb-0">
+                                            @if (selectedCoins.Count == 0)
                                             {
-                                                <span>Gráfico lineal del <strong>precio histórico</strong> en el período seleccionado.</span>
+                                                <span>@Loc["stats.pie.empty"]</span>
+                                            }
+                                            else if (hasCompared && selectedCoins.Count == 1)
+                                            {
+                                                <span>@Loc["stats.pie.emptySingle"]</span>
+                                            }
+                                            else if (hasCompared)
+                                            {
+                                                <span>@Loc["stats.pie.compare"]</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@Loc["stats.pie.default"]</span>
                                             }
                                         </p>
-                                    }
+                                    </div>
+                                    <div class="chart-body">
+                                        <canvas id="pieChart"></canvas>
+                                        <p class="chart-description">@((MarkupString)Loc["stats.pie.desc"])</p>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="chart-card stats-card">
+                                <div class="chart-header">
+                                    <h3 class="text-warning">
+                                        <i class="bi bi-bar-chart"></i> Cambios de Precio 24h
+                                    </h3>
+                                    <p class="text-muted mb-0">
+                                        @if (selectedCoins.Count == 0)
+                                        {
+                                            <span>@Loc["stats.bar.empty"]</span>
+                                        }
+                                        else if (hasCompared && selectedCoins.Count == 1)
+                                        {
+                                            <span>@Loc["stats.bar.emptySingle"]</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Variación de precio en las últimas 24h por moneda. Verde = subida,
+                                                Rojo = caída.</span>
+                                            }
+                                        </p>
+                                    </div>
+                                    <div class="chart-body">
+                                        <canvas id="barChart"></canvas>
+                                        <p class="chart-description">@((MarkupString)Loc["stats.bar.desc"])</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- ═══ Wide Stats Cards — Power BI Style ═══ -->
-                        <div class="stats-info-section">
-
-                            <!-- 1. Interpretación educativa -->
-                            <div class="stats-wide-card stats-card">
-                                <h3><i class="bi bi-info-circle"></i> Interpretación Educativa</h3>
-                                <div class="stats-explain-grid">
-                                    <div class="stats-explain-item">
-                                        <strong>Media (Promedio):</strong> Es el valor central de los precios en el período. Suma todos
-                                        los precios y los divide por la cantidad de datos.
-                                    </div>
-                                    <div class="stats-explain-item">
-                                        <strong>Mediana:</strong> Es el valor que está justo en el medio cuando se ordenan todos los
-                                        precios. No se ve afectada por valores extremos.
-                                    </div>
-                                    <div class="stats-explain-item">
-                                        <strong>Desviación Estándar:</strong> Mide qué tan dispersos están los precios respecto a la
-                                        media. Un valor alto indica alta volatilidad.
-                                    </div>
-                                    <div class="stats-explain-item">
-                                        <strong>Volumen 24h:</strong> Cantidad total de dinero negociado en las últimas 24 horas. Indica
-                                        el interés y liquidez del activo.
-                                    </div>
-                                    <div class="stats-explain-item">
-                                        <strong>Market Cap:</strong> Capitalización de mercado = Precio × Oferta circulante. Refleja el
-                                        valor total del activo en el mercado.
-                                    </div>
-                                    <div class="stats-explain-item">
-                                        <strong>Cambio 24h:</strong> Variación porcentual del precio en las últimas 24 horas. Verde =
-                                        subió, Rojo = bajó.
-                                    </div>
-                                </div>
-                                <p class="text-warning mt-3 mb-0">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    <strong>Nota Educativa:</strong> Los datos históricos son simulados con perfiles realistas. Los
-                                    precios actuales y market cap provienen de la API de Coinlore.
-                                </p>
-                            </div>
-
-                            <!-- 2. Resumen comparativo -->
-                            <div class="stats-wide-card stats-card">
-                                <h3><i class="bi bi-bar-chart-steps"></i> Resumen Comparativo</h3>
-                                <div class="stats-metrics-grid">
-                                    <div class="stats-metric-item">
-                                        <span class="stats-metric-label">Total monedas comparadas</span>
-                                        <span class="stats-metric-value">@(hasCompared ? selectedCoins.Count : cryptos.Count)</span>
-                                    </div>
-                                    <div class="stats-metric-item">
-                                        <span class="stats-metric-label">Mayor suba 24h</span>
-                                        <span class="stats-metric-value analytics-up">@GetStatsTopGainer()</span>
-                                    </div>
-                                    <div class="stats-metric-item">
-                                        <span class="stats-metric-label">Mayor baja 24h</span>
-                                        <span class="stats-metric-value analytics-down">@GetStatsTopLoser()</span>
-                                    </div>
-                                    <div class="stats-metric-item">
-                                        <span class="stats-metric-label">Mejor rendimiento prom.</span>
-                                        <span class="stats-metric-value analytics-up">@GetStatsBestAvg()</span>
-                                    </div>
-                                    <div class="stats-metric-item">
-                                        <span class="stats-metric-label">Peor rendimiento prom.</span>
-                                        <span class="stats-metric-value analytics-down">@GetStatsWorstAvg()</span>
-                                    </div>
-                                    <div class="stats-metric-item">
-                                        <span class="stats-metric-label">Cambio promedio 24h</span>
-                                        <span class="stats-metric-value">@((cryptos.Any() ? cryptos.Average(c => c.Change24h) :
-                                                                                                                                                                                                                                                                                                                                                                                                                                        0).ToString("F2"))%</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- 3. Análisis estadístico -->
-                                <div class="stats-wide-card stats-card">
-                                    <h3><i class="bi bi-calculator"></i> Análisis Estadístico</h3>
-                                    @{
-                                        var statsForDisplay = GetStatsForDisplay();
-                                    }
-                                    @if (statsForDisplay.Any())
-                                    {
-                                        <div class="stats-metrics-grid">
-                                            @foreach (var metric in statsForDisplay)
-                                            {
-                                                <div class="stats-metric-item">
-                                                    <span class="stats-metric-label">@metric.Label</span>
-                                                    <span class="stats-metric-value @metric.ValueClass">@metric.Value</span>
-                                                </div>
-                                            }
-                                        </div>
-                                        @if (hasCompared && selectedCoins.Count > 1)
+                        <!-- Portfolio Summary -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="stat-summary-card stats-card">
+                                    <h4 class="text-warning mb-1">
+                                        <i class="bi bi-list-check"></i> @Loc["stats.section.portfolio"]
+                                        @if (hasCompared && selectedCoins.Any())
                                         {
-                                            <p class="stats-note mt-3">
-                                                <i class="bi bi-info-circle"></i>
-                                                Métricas calculadas sobre el conjunto de las @selectedCoins.Count criptomonedas seleccionadas.
-                                            </p>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        <p class="text-muted">Seleccioná monedas y un período para ver estadísticas detalladas.</p>
-                                    }
-                                </div>
-
-
-                            </div>
-
-                            <!-- Portfolio Analysis -->
-                            @if (cryptos.Any())
-                            {
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        @if (pieKpiMode && hasCompared)
-                                        {
-                                            var kpiSym = selectedCoins.FirstOrDefault() ?? "";
-                                            decimal kpiToday = 0m, kpiYesterday = 0m;
-                                            if (marketCapData.TryGetValue(kpiSym, out var kpiMc))
-                                            {
-                                                kpiToday = kpiMc.Today;
-                                                kpiYesterday = kpiMc.Yesterday;
-                                            }
-                                            var kpiChangePct = kpiToday > 0 && kpiYesterday > 0
-                                                ? (kpiToday - kpiYesterday) / kpiYesterday * 100m : 0m;
-                                            var kpiCoinName = GetAvailableComparisonCoins()
-                                                .Where(c => c.Symbol.Equals(kpiSym, StringComparison.OrdinalIgnoreCase))
-                                                .Select(c => c.Name).FirstOrDefault() ?? kpiSym;
-                                            var kpiDirectionClass = kpiChangePct >= 0 ? "kpi-up" : "kpi-down";
-                                            var kpiCircleIcon = kpiChangePct >= 0 ? "bi-arrow-up-circle-fill" : "bi-arrow-down-circle-fill";
-                                            var kpiBadgeClass = kpiChangePct >= 0 ? "badge-up" : "badge-down";
-                                            var kpiArrowIcon = kpiChangePct >= 0 ? "bi-arrow-up" : "bi-arrow-down";
-                                            <div class="chart-card stats-card d-flex flex-column">
-                                                <div class="chart-header">
-                                                    <h3 class="text-warning">
-                                                        <i class="bi bi-bar-chart"></i> Market Cap — @kpiCoinName
-                                                    </h3>
-                                                    <p class="text-muted mb-0">Selecció 2 o más monedas para ver la distribución comparativa.
-                                                    </p>
-                                                </div>
-                                                <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 gap-3 py-3">
-                                                    <div class="kpi-row">
-                                                        <div class="kpi-card kpi-today stats-card">
-                                                            <span class="kpi-label">Hoy</span>
-                                                            <span class="kpi-value">$@FormatLargeNumber(kpiToday)</span>
-                                                        </div>
-                                                        <div class="kpi-arrow @kpiDirectionClass">
-                                                            <i class="bi @kpiCircleIcon"></i>
-                                                        </div>
-                                                        <div class="kpi-card kpi-yesterday stats-card">
-                                                            <span class="kpi-label">Ayer</span>
-                                                            <span class="kpi-value">$@FormatLargeNumber(kpiYesterday)</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="kpi-change-badge @kpiBadgeClass">
-                                                        <i class="bi @kpiArrowIcon"></i>
-                                                        @Math.Abs(kpiChangePct).ToString("F2")%
-                                                    </div>
-                                                    <p class="text-muted small text-center mb-0">
-                                                        <i class="bi bi-info-circle"></i>
-                                                        Capitaliz. de mercado hoy vs ayer. Selecció 2+ monedas para distribución comparativa.
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            <span class="text-muted fs-6 fw-normal ms-2">(@CoinsLabel(selectedCoins.Count))</span>
                                         }
                                         else
                                         {
-                                            <div class="chart-card stats-card">
-                                                <div class="chart-header">
-                                                    <h3 class="text-warning">
-                                                        <i class="bi bi-pie-chart"></i> Distribución de Market Cap
-                                                    </h3>
-                                                    <p class="text-muted mb-0">
-                                                        @if (selectedCoins.Count == 0)
-                                                        {
-                                                            <span>Seleccioná al menos una moneda para ver la distribución de market cap</span>
-                                                        }
-                                                        else if (hasCompared && selectedCoins.Count == 1)
-                                                        {
-                                                            <span>Agregá otra moneda para comparar la distribución</span>
-                                                        }
-                                                        else if (hasCompared)
-                                                        {
-                                                            <span>Capitalización de mercado comparada entre las monedas seleccionadas</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span>Proporción relativa de capitalización de mercado del portfolio</span>
-                                                        }
-                                                    </p>
-                                                </div>
-                                                <div class="chart-body">
-                                                    <canvas id="pieChart"></canvas>
-                                                    <p class="chart-description">Este gráfico muestra qué <strong>porcentaje del valor total del
-                                                        mercado</strong> representa cada criptomoneda seleccionada.</p>
+                                            <span class="text-muted fs-6 fw-normal ms-2">(@CoinsLabel(cryptos.Count))</span>
+                                        }
+                                    </h4>
+                                    <p class="chart-description mb-3" style="text-align:left;">
+                                        @if (hasCompared && selectedCoins.Count > 1)
+                                        {
+                                            <span>@Loc["stats.section.portfolio.desc"]</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@((MarkupString)Loc["stats.section.portfolio.descDefault"])</span>
+                                        }
+                                    </p>
+                                    @if (hasCompared && selectedCoins.Any())
+                                    {
+                                        // Modo comparación: iterar directamente sobre selectedCoins sin depender de la BD.
+                                        // Esto garantiza que se muestre 1 card por cada moneda seleccionada,
+                                        // incluso si la moneda no está guardada en la base de datos local.
+                                        var comparisonCoins = GetAvailableComparisonCoins().ToList();
+                                        var orderedSelected = selectedCoins
+                                            .OrderByDescending(s => marketCapData.TryGetValue(s.ToUpper(), out var mc2) ? mc2.Today : 0m)
+                                            .ToList();
+                                        Console.WriteLine($"[Portfolio] Monedas seleccionadas: {selectedCoins.Count} | Cargadas:                    {orderedSelected.Count}");
+                                        foreach (var s2 in orderedSelected)
+                                            Console.WriteLine($"[Portfolio] Moneda: {s2}");
+                                        <div class="portfolio-summary-grid">
+                                            @foreach (var sym in orderedSelected)
+                                            {
+                                                var symUpper = sym.ToUpper();
+                                                var dbCoin = cryptos.FirstOrDefault(c => c.Symbol.Equals(sym,
+                                StringComparison.OrdinalIgnoreCase));
+                                                var coinMeta = comparisonCoins.FirstOrDefault(c => c.Symbol.Equals(symUpper,
+                                StringComparison.OrdinalIgnoreCase));
+                                                var coinName = dbCoin?.Name ?? (coinMeta.Symbol != null ? coinMeta.Name : symUpper);
+                                                var change = change24hData.TryGetValue(symUpper, out var ch24) ? ch24 : (dbCoin?.Change24h
+                                ?? 0m);
+                                                var cap = marketCapData.TryGetValue(symUpper, out var mcVal) ? mcVal.Today :
+                                (dbCoin?.MarketCap ?? 0m);
+                                                var price = dbCoin?.CurrentPrice ?? 0m;
+                                                <div class="portfolio-card stats-card" @key="symUpper">
+                                                    <div class="portfolio-card-header">
+                                                        <div class="portfolio-coin-info">
+                                                            <span class="portfolio-coin-name">@coinName</span>
+                                                            <span class="portfolio-coin-symbol">@symUpper</span>
+                                                        </div>
+                                                        <div class="portfolio-badge-wrap text-end">
+                                                            <span class="portfolio-coin-change-label">@Loc["portfolio.priceChange24h"]</span>
+                                                            <span class="badge @(change >= 0 ? "bg-success" : "bg-danger") portfolio-badge">
+                                                                @(change >= 0 ? "+" : "")@change.ToString("F2")%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="portfolio-card-body">
+                                                        <div class="portfolio-data-row">
+                                                            <span class="portfolio-data-label">@Loc["stats.portfolio.price"]</span>
+                                                            <span class="portfolio-data-value">$@price.ToString("N2")</span>
+                                                        </div>
+                                                        <div class="portfolio-data-row">
+                                                            <span class="portfolio-data-label">@Loc["stats.portfolio.marketCap"]</span>
+                                                            <span class="portfolio-data-value">$@FormatLargeNumber(cap)</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             }
                                         </div>
-
-                                        <div class="col-md-6">
-                                            <div class="chart-card stats-card">
-                                                <div class="chart-header">
-                                                    <h3 class="text-warning">
-                                                        <i class="bi bi-bar-chart"></i> Cambios de Precio 24h
-                                                    </h3>
-                                                    <p class="text-muted mb-0">
-                                                        @if (selectedCoins.Count == 0)
-                                                        {
-                                                            <span>Seleccioná al menos una moneda para ver los cambios de precio</span>
-                                                        }
-                                                        else if (hasCompared && selectedCoins.Count == 1)
-                                                        {
-                                                            <span>Agregá otra moneda para comparar los cambios de precio</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span>Variación de precio en las últimas 24h por moneda. Verde = subida,
-                                                                Rojo = caída.</span>
-                                                            }
-                                                        </p>
-                                                    </div>
-                                                    <div class="chart-body">
-                                                        <canvas id="barChart"></canvas>
-                                                        <p class="chart-description">Este gráfico compara la <strong>variación porcentual del
-                                                            precio</strong> de cada criptomoneda durante las <strong>últimas 24 horas</strong>.
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Portfolio Summary -->
-                                        <div class="row">
-                                            <div class="col-12">
-                                                <div class="stat-summary-card stats-card">
-                                                    <h4 class="text-warning mb-1">
-                                                        <i class="bi bi-list-check"></i> Resumen del Portfolio
-                                                        @if (hasCompared && selectedCoins.Any())
-                                                        {
-                                                            <span class="text-muted fs-6 fw-normal ms-2">(@selectedCoins.Count
-                                                                moneda@(selectedCoins.Count == 1 ? "" : "s"))</span>
-                                                            }
+                                    }
                                     else
-                                                            {
-                                                                <span class="text-muted fs-6 fw-normal ms-2">(@cryptos.Count moneda@(cryptos.Count == 1 ? "" :
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "s"))</span>
-                                                                }
-                                                            </h4>
-                                                            <p class="chart-description mb-3" style="text-align:left;">
-                                                                @if (hasCompared && selectedCoins.Count > 1)
-                                                                {
-                                                                    <span>Precio actual, capitalización de mercado y variación diaria de cada activo
-                                                                        seleccionado.</span>
-                                                                    }
-                                    else
-                                                                    {
-                                                                        <span>Esta sección resume el <strong>precio actual</strong>, la <strong>capitalización de
-                                                                            mercado</strong> y la <strong>variación diaria</strong> de cada activo.</span>
-                                                                        }
-                                                                    </p>
-                                                                    @if (hasCompared && selectedCoins.Any())
-                                                                    {
-                                                                        // Modo comparación: iterar directamente sobre selectedCoins sin depender de la BD.
-                                                                        // Esto garantiza que se muestre 1 card por cada moneda seleccionada,
-                                                                        // incluso si la moneda no está guardada en la base de datos local.
-                                                                        var comparisonCoins = GetAvailableComparisonCoins().ToList();
-                                                                        var orderedSelected = selectedCoins
-                                                                            .OrderByDescending(s => marketCapData.TryGetValue(s.ToUpper(), out var mc2) ? mc2.Today : 0m)
-                                                                            .ToList();
-                                                                        Console.WriteLine($"[Portfolio] Monedas seleccionadas: {selectedCoins.Count} | Cargadas:                    {orderedSelected.Count}");
-                                                                        foreach (var s2 in orderedSelected)
-                                                                            Console.WriteLine($"[Portfolio] Moneda: {s2}");
-                                                                        <div class="portfolio-summary-grid">
-                                                                            @foreach (var sym in orderedSelected)
-                                                                            {
-                                                                                var symUpper = sym.ToUpper();
-                                                                                var dbCoin = cryptos.FirstOrDefault(c => c.Symbol.Equals(sym,
-                                                                StringComparison.OrdinalIgnoreCase));
-                                                                                var coinMeta = comparisonCoins.FirstOrDefault(c => c.Symbol.Equals(symUpper,
-                                                                StringComparison.OrdinalIgnoreCase));
-                                                                                var coinName = dbCoin?.Name ?? (coinMeta.Symbol != null ? coinMeta.Name : symUpper);
-                                                                                var change = change24hData.TryGetValue(symUpper, out var ch24) ? ch24 : (dbCoin?.Change24h
-                                                                ?? 0m);
-                                                                                var cap = marketCapData.TryGetValue(symUpper, out var mcVal) ? mcVal.Today :
-                                                                (dbCoin?.MarketCap ?? 0m);
-                                                                                var price = dbCoin?.CurrentPrice ?? 0m;
-                                                                                <div class="portfolio-card stats-card" @key="symUpper">
-                                                                                    <div class="portfolio-card-header">
-                                                                                        <div class="portfolio-coin-info">
-                                                                                            <span class="portfolio-coin-name">@coinName</span>
-                                                                                            <span class="portfolio-coin-symbol">@symUpper</span>
-                                                                                        </div>
-                                                                                        <span class="badge @(change >= 0 ? "bg-success" : "bg-danger") portfolio-badge">
-                                                                                            @(change >= 0 ? "+" : "")@change.ToString("F2")%
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div class="portfolio-card-body">
-                                                                                        <div class="portfolio-data-row">
-                                                                                            <span class="portfolio-data-label">Precio</span>
-                                                                                            <span class="portfolio-data-value">$@price.ToString("N2")</span>
-                                                                                        </div>
-                                                                                        <div class="portfolio-data-row">
-                                                                                            <span class="portfolio-data-label">Market Cap</span>
-                                                                                            <span class="portfolio-data-value">$@FormatLargeNumber(cap)</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            }
-                                                                        </div>
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        var portfolioCoins = cryptos
-                                                                            .OrderByDescending(c => c.MarketCap)
-                                                                            .ToList();
-                                                                        Console.WriteLine($"[Portfolio] Modo portfolio: {portfolioCoins.Count} monedas");
-                                                                        <div class="portfolio-summary-grid">
-                                                                            @foreach (var crypto in portfolioCoins)
-                                                                            {
-                                                                                <div class="portfolio-card stats-card" @key="crypto.Symbol">
-                                                                                    <div class="portfolio-card-header">
-                                                                                        <div class="portfolio-coin-info">
-                                                                                            <span class="portfolio-coin-name">@crypto.Name</span>
-                                                                                            <span class="portfolio-coin-symbol">@crypto.Symbol.ToUpper()</span>
-                                                                                        </div>
-                                                                                        <span
-                                                                                            class="badge @(crypto.Change24h >= 0 ? "bg-success" : "bg-danger") portfolio-badge">
-                                                                                            @(crypto.Change24h >= 0 ? "+" : "")@crypto.Change24h.ToString("F2")%
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div class="portfolio-card-body">
-                                                                                        <div class="portfolio-data-row">
-                                                                                            <span class="portfolio-data-label">Precio</span>
-                                                                                            <span class="portfolio-data-value">$@crypto.CurrentPrice.ToString("N2")</span>
-                                                                                        </div>
-                                                                                        <div class="portfolio-data-row">
-                                                                                            <span class="portfolio-data-label">Market Cap</span>
-                                                                                            <span class="portfolio-data-value">$@FormatLargeNumber(crypto.MarketCap)</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            }
-                                                                        </div>
-                                                                    }
-                                                                </div>
-                                                            </div>
+                                    {
+                                        var portfolioCoins = cryptos
+                                            .OrderByDescending(c => c.MarketCap)
+                                            .ToList();
+                                        Console.WriteLine($"[Portfolio] Modo portfolio: {portfolioCoins.Count} monedas");
+                                        <div class="portfolio-summary-grid">
+                                            @foreach (var crypto in portfolioCoins)
+                                            {
+                                                <div class="portfolio-card stats-card" @key="crypto.Symbol">
+                                                    <div class="portfolio-card-header">
+                                                        <div class="portfolio-coin-info">
+                                                            <span class="portfolio-coin-name">@crypto.Name</span>
+                                                            <span class="portfolio-coin-symbol">@crypto.Symbol.ToUpper()</span>
                                                         </div>
-                                                    }
-                                                                            else
-                                                    {
-                                                        <div class="stats-empty-state stats-empty-full">
-                                                            <div class="stats-empty-icon">
-                                                                <i class="bi bi-coin"></i>
-                                                            </div>
-                                                            <p class="stats-empty-title">No hay datos de portfolio</p>
-                                                            <p class="stats-empty-sub">Agregá criptomonedas a tu portfolio para ver estadísticas y gráficos
-                                                                históricos.</p>
-                                                                <a href="/cryptolist" class="stats-empty-cta">
-                                                                    <i class="bi bi-plus-circle"></i> Agregar Criptomonedas
-                                                                </a>
-                                                            </div>
-                                                        }
+                                                        <div class="portfolio-badge-wrap text-end">
+                                                            <span class="portfolio-coin-change-label">@Loc["portfolio.priceChange24h"]</span>
+                                                            <span
+                                                                class="badge @(crypto.Change24h >= 0 ? "bg-success" : "bg-danger") portfolio-badge">
+                                                                @(crypto.Change24h >= 0 ? "+" : "")@crypto.Change24h.ToString("F2")%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="portfolio-card-body">
+                                                        <div class="portfolio-data-row">
+                                                            <span class="portfolio-data-label">@Loc["stats.portfolio.price"]</span>
+                                                            <span class="portfolio-data-value">$@crypto.CurrentPrice.ToString("N2")</span>
+                                                        </div>
+                                                        <div class="portfolio-data-row">
+                                                            <span class="portfolio-data-label">@Loc["stats.portfolio.marketCap"]</span>
+                                                            <span class="portfolio-data-value">$@FormatLargeNumber(crypto.MarketCap)</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-
-                                                <style>
-                                                    @@keyframes chartFadeIn {
-                                                        from {
-                                                            opacity: 0;
-                                                            transform: translateY(8px);
-                                                        }
-
-                                                        to {
-                                                            opacity: 1;
-                                                            transform: translateY(0);
-                                                        }
-                                                    }
-
-                                                    .chart-fade-anim {
-                                                        animation: chartFadeIn 0.35s ease both;
-                                                    }
-
-                                                    .chart-card {
-                                                        min-height: 430px;
-                                                        padding: 1.5rem;
-                                                        overflow: visible;
-                                                    }
-
-                                                    .chart-body {
-                                                        min-height: 300px;
-                                                        display: flex;
-                                                        flex-direction: column;
-                                                        justify-content: center;
-                                                    }
-
-                                                    .chart-body canvas {
-                                                        max-height: 230px !important;
-                                                    }
-
-                                                    .chart-description {
-                                                        margin-top: 18px;
-                                                        margin-bottom: 0;
-                                                        padding-bottom: 8px;
-                                                    }
-
-                                                    /* ── Descripciones de gráficos ─────────────────────────────────────── */
-                                                    .chart-description {
-                                                        margin-top: 12px;
-                                                        text-align: center;
-                                                        font-size: 0.9rem;
-                                                        color: var(--text-secondary);
-                                                        line-height: 1.6;
-                                                        opacity: 1;
-                                                        font-family: 'Poppins', 'Inter', sans-serif;
-                                                        animation: chartFadeIn 0.4s ease both;
-                                                    }
-
-                                                    .chart-description strong {
-                                                        color: #ff8f00;
-                                                        font-weight: 600;
-                                                    }
-
-                                                    @@media (max-width: 576px) {
-                                                        .chart-description {
-                                                            font-size: 0.82rem;
-                                                            padding: 0 0.5rem;
-                                                        }
-                                                    }
-
-                                                    /* ── Cards analíticas sobre el gráfico histórico ──────────────────── */
-                                                    .analytics-card {
-                                                        background: rgba(255, 122, 0, 0.06);
-                                                        border: 1px solid rgba(255, 122, 0, 0.18);
-                                                        border-radius: 10px;
-                                                        padding: var(--card-padding);
-                                                        display: flex;
-                                                        flex-direction: column;
-                                                        justify-content: space-between;
-                                                        gap: .4rem;
-                                                        min-height: 82px;
-                                                        height: 100%;
-                                                        box-sizing: border-box;
-                                                        overflow: hidden;
-                                                    }
-
-                                                    .analytics-label {
-                                                        font-size: .72rem;
-                                                        font-weight: 600;
-                                                        letter-spacing: .045em;
-                                                        text-transform: uppercase;
-                                                        color: var(--text-secondary);
-                                                        line-height: 1.3;
-                                                        white-space: nowrap;
-                                                        overflow: hidden;
-                                                        text-overflow: ellipsis;
-                                                        flex-shrink: 0;
-                                                    }
-
-                                                    .analytics-value {
-                                                        font-size: clamp(0.82rem, 1.8vw, 0.96rem);
-                                                        font-weight: 700;
-                                                        font-family: 'Inter', sans-serif;
-                                                        color: var(--text-primary);
-                                                        line-height: 1.4;
-                                                        word-break: break-word;
-                                                        overflow-wrap: anywhere;
-                                                        white-space: nowrap;
-                                                        overflow: hidden;
-                                                        text-overflow: ellipsis;
-                                                        margin-top: auto;
-                                                    }
-
-                                                    .analytics-up {
-                                                        color: var(--state-success);
-                                                    }
-
-                                                    .analytics-down {
-                                                        color: var(--state-error);
-                                                    }
-
-                                                    /* ── Gráfico principal ─────────────────────────────────────────────── */
-                                                    .cv-main-chart-card {
-                                                        height: auto !important;
-                                                        max-height: none !important;
-                                                        min-height: 520px;
-                                                        padding-bottom: 28px;
-                                                    }
-
-                                                    .chart-caption {
-                                                        margin-top: 16px;
-                                                        text-align: center;
-                                                        font-size: 0.95rem;
-                                                        line-height: 1.4;
-                                                        color: var(--text-secondary);
-                                                        font-family: 'Poppins', 'Inter', sans-serif;
-                                                    }
-
-                                                    .chart-caption strong {
-                                                        color: #ff8f00;
-                                                        font-weight: 600;
-                                                    }
-
-                                                    .chart-main-description {
-                                                        margin-top: 10px;
-                                                        margin-bottom: 0;
-                                                        text-align: center;
-                                                        font-size: 0.88rem;
-                                                        color: var(--text-secondary);
-                                                        line-height: 1.6;
-                                                        opacity: 1;
-                                                        font-family: 'Poppins', 'Inter', sans-serif;
-                                                    }
-
-                                                    .chart-main-description strong {
-                                                        color: #ff8f00;
-                                                        font-weight: 600;
-                                                    }
-
-                                                    /* ── Portfolio Summary Grid ────────────────────────────────────────── */
-                                                    .portfolio-summary-grid {
-                                                        display: grid;
-                                                        grid-template-columns: repeat(2, 1fr);
-                                                        gap: var(--dashboard-gap);
-                                                        align-items: stretch;
-                                                        margin-top: var(--card-padding);
-                                                    }
-
-                                                    @@media (min-width: 1200px) {
-                                                        .portfolio-summary-grid {
-                                                            grid-template-columns: repeat(3, 1fr);
-                                                        }
-                                                    }
-
-                                                    @@media (max-width: 768px) {
-                                                        .portfolio-summary-grid {
-                                                            grid-template-columns: 1fr;
-                                                        }
-                                                    }
-
-                                                    .portfolio-card {
-                                                        background: var(--bg-card);
-                                                        border: 1px solid var(--border-soft);
-                                                        border-radius: 14px;
-                                                        padding: 16px;
-                                                        transition: border-color 0.2s, box-shadow 0.2s;
-                                                        display: flex;
-                                                        flex-direction: column;
-                                                        justify-content: space-between;
-                                                        min-height: 140px;
-                                                        height: 100%;
-                                                        box-sizing: border-box;
-                                                        overflow: hidden;
-                                                    }
-
-                                                    .portfolio-card-header {
-                                                        display: flex;
-                                                        justify-content: space-between;
-                                                        align-items: flex-start;
-                                                        gap: 12px;
-                                                        min-height: 44px;
-                                                    }
-
-                                                    .portfolio-coin-info {
-                                                        display: flex;
-                                                        flex-direction: column;
-                                                        gap: 0.15rem;
-                                                        min-width: 0;
-                                                        flex: 1;
-                                                        overflow: hidden;
-                                                    }
-
-                                                    .portfolio-badge {
-                                                        flex-shrink: 0;
-                                                        align-self: flex-start;
-                                                        font-size: 0.82rem;
-                                                        padding: 0.3rem 0.65rem;
-                                                        border-radius: 8px;
-                                                        white-space: nowrap;
-                                                        font-weight: 600;
-                                                    }
-
-                                                    .portfolio-card-body {
-                                                        display: flex;
-                                                        flex-direction: column;
-                                                        gap: 0.4rem;
-                                                        border-top: 1px solid var(--border-soft);
-                                                        padding-top: 10px;
-                                                        margin-top: auto;
-                                                    }
-
-                                                    .portfolio-data-row {
-                                                        display: flex;
-                                                        justify-content: space-between;
-                                                        align-items: baseline;
-                                                        gap: 0.5rem;
-                                                    }
-
-                                                    .portfolio-data-label {
-                                                        font-size: 0.8rem;
-                                                        color: var(--text-secondary);
-                                                        font-weight: 400;
-                                                        white-space: nowrap;
-                                                        flex-shrink: 0;
-                                                    }
-
-                                                    .portfolio-data-value {
-                                                        font-size: 0.88rem;
-                                                        color: var(--text-primary);
-                                                        font-weight: 600;
-                                                        text-align: right;
-                                                        word-break: break-word;
-                                                        overflow-wrap: anywhere;
-                                                        min-width: 0;
-                                                    }
-
-                                                    .stats-container {
-                                                        padding-bottom: 2.5rem;
-                                                    }
-
-                                                    .stat-summary-card {
-                                                        overflow: visible;
-                                                    }
-
-                                                    /* ═══ Wide Stats Cards — Power BI Style ═══ */
-                                                    .stats-info-section {
-                                                        display: flex;
-                                                        flex-direction: column;
-                                                        gap: var(--section-gap);
-                                                        margin-top: var(--section-gap);
-                                                    }
-
-                                                    .stats-wide-card {
-                                                        width: 100%;
-                                                        background: var(--bg-card, #111827);
-                                                        border: 1px solid rgba(235, 118, 18, 0.35);
-                                                        border-radius: 16px;
-                                                        padding: var(--card-padding-lg);
-                                                        box-shadow:
-                                                            0 0 12px rgba(235, 118, 18, 0.12),
-                                                            0 8px 24px rgba(0, 0, 0, 0.35);
-                                                    }
-
-                                                    .stats-wide-card h3 {
-                                                        color: #EB7612;
-                                                        font-size: 1.35rem;
-                                                        font-weight: 700;
-                                                        margin-bottom: 1rem;
-                                                    }
-
-                                                    .stats-metrics-grid {
-                                                        display: grid;
-                                                        grid-template-columns: repeat(3, minmax(0, 1fr));
-                                                        gap: 1rem;
-                                                    }
-
-                                                    .stats-metric-item {
-                                                        background: rgba(255, 255, 255, 0.035);
-                                                        border: 1px solid rgba(255, 255, 255, 0.06);
-                                                        border-radius: 12px;
-                                                        padding: 0.85rem 1rem;
-                                                    }
-
-                                                    .stats-metric-label {
-                                                        font-size: 0.78rem;
-                                                        color: #9CA3AF;
-                                                        text-transform: uppercase;
-                                                        letter-spacing: 0.04em;
-                                                        font-weight: 600;
-                                                        display: block;
-                                                        margin-bottom: 0.25rem;
-                                                    }
-
-                                                    .stats-metric-value {
-                                                        font-size: 1.1rem;
-                                                        font-weight: 700;
-                                                        color: #F59E0B;
-                                                    }
-
-                                                    .stats-explain-grid {
-                                                        display: grid;
-                                                        grid-template-columns: repeat(2, minmax(0, 1fr));
-                                                        gap: 0.9rem 1.25rem;
-                                                    }
-
-                                                    .stats-explain-item {
-                                                        color: #D1D5DB;
-                                                        line-height: 1.5;
-                                                        font-size: 0.88rem;
-                                                    }
-
-                                                    .stats-explain-item strong {
-                                                        color: #22C55E;
-                                                    }
-
-                                                    .stats-note {
-                                                        font-size: 0.85rem;
-                                                        color: var(--text-secondary);
-                                                    }
-
-                                                    @@media (max-width: 1024px) {
-                                                        .stats-metrics-grid {
-                                                            grid-template-columns: repeat(2, minmax(0, 1fr));
-                                                        }
-
-                                                        .stats-explain-grid {
-                                                            grid-template-columns: 1fr;
-                                                        }
-                                                    }
-
-                                                    @@media (max-width: 640px) {
-                                                        .stats-metrics-grid {
-                                                            grid-template-columns: 1fr;
-                                                        }
-
-                                                        .stats-wide-card {
-                                                            padding: 1rem;
-                                                        }
-                                                    }
-
-                                                    /* ── Mobile: analytics cards, chart cards ── */
-                                                    @@media (max-width: 767px) {
-
-                                                        /* Sin márgenes negativos — .content ya tiene 12px de padding en móvil.
-                                                                                                           Las cards ocupan naturalmente ~93.8% del viewport, centradas. */
-                                                        .stats-page {
-                                                            margin-left: 0;
-                                                            margin-right: 0;
-                                                            width: 100%;
-                                                            padding-left: 0 !important;
-                                                            padding-right: 0 !important;
-                                                            box-sizing: border-box;
-                                                        }
-
-                                                        .stats-container {
-                                                            margin-left: 0;
-                                                            margin-right: 0;
-                                                            width: 100%;
-                                                            padding-left: 0;
-                                                            padding-right: 0;
-                                                            box-sizing: border-box;
-                                                        }
-
-                                                        /* ═══ Todas las cards: centradas, sin desborde ═══ */
-                                                        .stats-page .comparison-panel,
-                                                        .stats-page .stats-wide-card,
-                                                        .stats-page .chart-card,
-                                                        .stats-page .stat-summary-card {
-                                                            width: 100%;
-                                                            max-width: 100%;
-                                                            margin-left: auto;
-                                                            margin-right: auto;
-                                                            box-sizing: border-box;
-                                                        }
-
-                                                        /* Neutralizar márgenes negativos de Bootstrap .row */
-                                                        .stats-page .row {
-                                                            margin-left: 0;
-                                                            margin-right: 0;
-                                                        }
-
-                                                        /* Columnas de Bootstrap: reducir gutter */
-                                                        .stats-page .row>[class*="col-"] {
-                                                            padding-left: 6px;
-                                                            padding-right: 6px;
-                                                        }
-
-                                                        .analytics-card {
-                                                            padding: var(--card-padding);
-                                                            min-height: 68px;
-                                                        }
-
-                                                        .analytics-value {
-                                                            font-size: 0.82rem;
-                                                        }
-
-                                                        .cv-main-chart-card {
-                                                            min-height: 400px;
-                                                            padding: var(--card-padding-lg);
-                                                        }
-
-                                                        .chart-card {
-                                                            padding: 1rem;
-                                                        }
-
-                                                        .chart-wrapper {
-                                                            height: 260px;
-                                                            min-height: 260px;
-                                                        }
-
-                                                        .chart-body canvas {
-                                                            max-width: 100% !important;
-                                                        }
-                                                    }
-
-                                                    /* ── Extra-small phones (iPhone 12/13/14, ≤430px): 1 card por fila ── */
-                                                    @@media (max-width: 430px) {
-                                                        .analytics-cards-row {
-                                                            display: flex;
-                                                            flex-direction: column;
-                                                            gap: 0.5rem;
-                                                        }
-
-                                                        .analytics-cards-row>[class*="col-"] {
-                                                            width: 100%;
-                                                            max-width: 100%;
-                                                            flex: 0 0 100%;
-                                                            padding-left: 0;
-                                                            padding-right: 0;
-                                                        }
-
-                                                        .analytics-card {
-                                                            width: 100%;
-                                                        }
-
-                                                        /* Cards ocupan ~96% del contenedor, centradas */
-                                                        .stats-page .comparison-panel,
-                                                        .stats-page .stats-wide-card,
-                                                        .stats-page .chart-card,
-                                                        .stats-page .stat-summary-card {
-                                                            width: 96%;
-                                                            max-width: 96%;
-                                                            margin-left: auto;
-                                                            margin-right: auto;
-                                                        }
-                                                    }
-                                                </style>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                                                                            else
+                    {
+                        <div class="stats-empty-state stats-empty-full">
+                            <div class="stats-empty-icon">
+                                <i class="bi bi-coin"></i>
+                            </div>
+                            <p class="stats-empty-title">@Loc["stats.empty.portfolio"]</p>
+                            <p class="stats-empty-sub">@Loc["stats.empty.portfolio.sub"]</p>
+                            <a href="/cryptolist" class="stats-empty-cta">
+                                <i class="bi bi-plus-circle"></i> @Loc["stats.empty.portfolio.cta"]
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <style>
+                @@keyframes chartFadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(8px);
+                    }
+
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                .chart-fade-anim {
+                    animation: chartFadeIn 0.35s ease both;
+                }
+
+                .chart-card {
+                    min-height: 430px;
+                    padding: 1.5rem;
+                    overflow: visible;
+                }
+
+                .chart-body {
+                    min-height: 300px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                }
+
+                .chart-body canvas {
+                    max-height: 230px !important;
+                }
+
+                .chart-description {
+                    margin-top: 18px;
+                    margin-bottom: 0;
+                    padding-bottom: 8px;
+                }
+
+                /* ── Descripciones de gráficos ─────────────────────────────────────── */
+                .chart-description {
+                    margin-top: 12px;
+                    text-align: center;
+                    font-size: 0.9rem;
+                    color: var(--text-secondary);
+                    line-height: 1.6;
+                    opacity: 1;
+                    font-family: 'Poppins', 'Inter', sans-serif;
+                    animation: chartFadeIn 0.4s ease both;
+                }
+
+                .chart-description strong {
+                    color: #ff8f00;
+                    font-weight: 600;
+                }
+
+                @@media (max-width: 576px) {
+                    .chart-description {
+                        font-size: 0.82rem;
+                        padding: 0 0.5rem;
+                    }
+                }
+
+                /* ── Cards analíticas sobre el gráfico histórico ──────────────────── */
+                .analytics-card {
+                    background: rgba(255, 122, 0, 0.06);
+                    border: 1px solid rgba(255, 122, 0, 0.18);
+                    border-radius: 10px;
+                    padding: var(--card-padding);
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    gap: .4rem;
+                    min-height: 82px;
+                    height: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                }
+
+                .analytics-label {
+                    font-size: .72rem;
+                    font-weight: 600;
+                    letter-spacing: .045em;
+                    text-transform: uppercase;
+                    color: var(--text-secondary);
+                    line-height: 1.3;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    flex-shrink: 0;
+                }
+
+                .analytics-value {
+                    font-size: clamp(0.82rem, 1.8vw, 0.96rem);
+                    font-weight: 700;
+                    font-family: 'Inter', sans-serif;
+                    color: var(--text-primary);
+                    line-height: 1.4;
+                    word-break: break-word;
+                    overflow-wrap: anywhere;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    margin-top: auto;
+                }
+
+                .analytics-up {
+                    color: var(--state-success);
+                }
+
+                .analytics-down {
+                    color: var(--state-error);
+                }
+
+                /* ── Gráfico principal ─────────────────────────────────────────────── */
+                .cv-main-chart-card {
+                    height: auto !important;
+                    max-height: none !important;
+                    min-height: 520px;
+                    padding-bottom: 28px;
+                }
+
+                .chart-caption {
+                    margin-top: 16px;
+                    text-align: center;
+                    font-size: 0.95rem;
+                    line-height: 1.4;
+                    color: var(--text-secondary);
+                    font-family: 'Poppins', 'Inter', sans-serif;
+                }
+
+                .chart-caption strong {
+                    color: #ff8f00;
+                    font-weight: 600;
+                }
+
+                .chart-main-description {
+                    margin-top: 10px;
+                    margin-bottom: 0;
+                    text-align: center;
+                    font-size: 0.88rem;
+                    color: var(--text-secondary);
+                    line-height: 1.6;
+                    opacity: 1;
+                    font-family: 'Poppins', 'Inter', sans-serif;
+                }
+
+                .chart-main-description strong {
+                    color: #ff8f00;
+                    font-weight: 600;
+                }
+
+                /* ── Portfolio Summary Grid ────────────────────────────────────────── */
+                .portfolio-summary-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: var(--dashboard-gap);
+                    align-items: stretch;
+                    margin-top: var(--card-padding);
+                }
+
+                @@media (min-width: 1200px) {
+                    .portfolio-summary-grid {
+                        grid-template-columns: repeat(3, 1fr);
+                    }
+                }
+
+                @@media (max-width: 768px) {
+                    .portfolio-summary-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                .portfolio-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-soft);
+                    border-radius: 14px;
+                    padding: 16px;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    min-height: 140px;
+                    height: 100%;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                }
+
+                .portfolio-card-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 12px;
+                    min-height: 44px;
+                }
+
+                .portfolio-coin-info {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.15rem;
+                    min-width: 0;
+                    flex: 1;
+                    overflow: hidden;
+                }
+
+                .portfolio-badge-wrap {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 2px;
+                }
+
+                .portfolio-coin-change-label {
+                    font-size: 0.6rem;
+                    color: var(--text-secondary);
+                    line-height: 1.2;
+                    text-transform: uppercase;
+                    letter-spacing: 0.02em;
+                }
+
+                @@media (min-width: 480px) {
+                    .portfolio-coin-change-label {
+                        display: none;
+                    }
+                }
+
+                .portfolio-badge {
+                    flex-shrink: 0;
+                    align-self: flex-start;
+                    font-size: 0.82rem;
+                    padding: 0.3rem 0.65rem;
+                    border-radius: 8px;
+                    white-space: nowrap;
+                    font-weight: 600;
+                }
+
+                .portfolio-card-body {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem;
+                    border-top: 1px solid var(--border-soft);
+                    padding-top: 10px;
+                    margin-top: auto;
+                }
+
+                .portfolio-data-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: baseline;
+                    gap: 0.5rem;
+                }
+
+                .portfolio-data-label {
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    font-weight: 400;
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                }
+
+                .portfolio-data-value {
+                    font-size: 0.88rem;
+                    color: var(--text-primary);
+                    font-weight: 600;
+                    text-align: right;
+                    word-break: break-word;
+                    overflow-wrap: anywhere;
+                    min-width: 0;
+                }
+
+                .stats-container {
+                    padding-bottom: 2.5rem;
+                }
+
+                .stat-summary-card {
+                    overflow: visible;
+                }
+
+                /* ═══ Wide Stats Cards — Power BI Style ═══ */
+                .stats-info-section {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--section-gap);
+                    margin-top: var(--section-gap);
+                }
+
+                .stats-wide-card {
+                    width: 100%;
+                    background: var(--bg-card, #111827);
+                    border: 1px solid rgba(235, 118, 18, 0.35);
+                    border-radius: 16px;
+                    padding: var(--card-padding-lg);
+                    box-shadow:
+                        0 0 12px rgba(235, 118, 18, 0.12),
+                        0 8px 24px rgba(0, 0, 0, 0.35);
+                }
+
+                .stats-wide-card h3 {
+                    color: #EB7612;
+                    font-size: 1.35rem;
+                    font-weight: 700;
+                    margin-bottom: 1rem;
+                }
+
+                .stats-metrics-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 1rem;
+                }
+
+                .stats-metric-item {
+                    background: rgba(255, 255, 255, 0.035);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    border-radius: 12px;
+                    padding: 0.85rem 1rem;
+                }
+
+                .stats-metric-label {
+                    font-size: 0.78rem;
+                    color: #9CA3AF;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    font-weight: 600;
+                    display: block;
+                    margin-bottom: 0.25rem;
+                }
+
+                .stats-metric-value {
+                    font-size: 1.1rem;
+                    font-weight: 700;
+                    color: #F59E0B;
+                }
+
+                .stats-explain-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 0.9rem 1.25rem;
+                }
+
+                .stats-explain-item {
+                    color: #D1D5DB;
+                    line-height: 1.5;
+                    font-size: 0.88rem;
+                }
+
+                .stats-explain-item strong {
+                    color: #22C55E;
+                }
+
+                .stats-note {
+                    font-size: 0.85rem;
+                    color: var(--text-secondary);
+                }
+
+                @@media (max-width: 1024px) {
+                    .stats-metrics-grid {
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                    }
+
+                    .stats-explain-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                @@media (max-width: 640px) {
+                    .stats-metrics-grid {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .stats-wide-card {
+                        padding: 1rem;
+                    }
+                }
+
+                /* ── Mobile: analytics cards, chart cards ── */
+                @@media (max-width: 767px) {
+
+                    /* Sin márgenes negativos — .content ya tiene 12px de padding en móvil.
+                                                                                                                                                                                                       Las cards ocupan naturalmente ~93.8% del viewport, centradas. */
+                    .stats-page {
+                        margin-left: 0;
+                        margin-right: 0;
+                        width: 100%;
+                        padding-left: 0 !important;
+                        padding-right: 0 !important;
+                        box-sizing: border-box;
+                    }
+
+                    .stats-container {
+                        margin-left: 0;
+                        margin-right: 0;
+                        width: 100%;
+                        padding-left: 0;
+                        padding-right: 0;
+                        box-sizing: border-box;
+                    }
+
+                    /* ═══ Todas las cards: centradas, sin desborde ═══ */
+                    .stats-page .comparison-panel,
+                    .stats-page .stats-wide-card,
+                    .stats-page .chart-card,
+                    .stats-page .stat-summary-card {
+                        width: 100%;
+                        max-width: 100%;
+                        margin-left: auto;
+                        margin-right: auto;
+                        box-sizing: border-box;
+                    }
+
+                    /* Neutralizar márgenes negativos de Bootstrap .row */
+                    .stats-page .row {
+                        margin-left: 0;
+                        margin-right: 0;
+                    }
+
+                    /* Columnas de Bootstrap: reducir gutter */
+                    .stats-page .row>[class*="col-"] {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                    }
+
+                    .analytics-card {
+                        padding: var(--card-padding);
+                        min-height: 68px;
+                    }
+
+                    .analytics-value {
+                        font-size: 0.82rem;
+                    }
+
+                    .cv-main-chart-card {
+                        min-height: 400px;
+                        padding: var(--card-padding-lg);
+                    }
+
+                    .chart-card {
+                        padding: 1rem;
+                    }
+
+                    .chart-wrapper {
+                        height: 260px;
+                        min-height: 260px;
+                    }
+
+                    .chart-body canvas {
+                        max-width: 100% !important;
+                    }
+                }
+
+                /* ── Extra-small phones (iPhone 12/13/14, ≤430px): 1 card por fila ── */
+                @@media (max-width: 430px) {
+                    .analytics-cards-row {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0.5rem;
+                    }
+
+                    .analytics-cards-row>[class*="col-"] {
+                        width: 100%;
+                        max-width: 100%;
+                        flex: 0 0 100%;
+                        padding-left: 0;
+                        padding-right: 0;
+                    }
+
+                    .analytics-card {
+                        width: 100%;
+                    }
+
+                    /* Cards ocupan ~96% del contenedor, centradas */
+                    .stats-page .comparison-panel,
+                    .stats-page .stats-wide-card,
+                    .stats-page .chart-card,
+                    .stats-page .stat-summary-card {
+                        width: 96%;
+                        max-width: 96%;
+                        margin-left: auto;
+                        margin-right: auto;
+                    }
+                }
+            </style>
 @code {
 
     private List<CryptoCurrency> cryptos = new();
@@ -1144,8 +1181,8 @@
     private string? chartApiError = null;
 
     // Dynamic chart labels
-    private string lineChartTitle = "Evolución histórica de precios";
-    private string lineChartSubtitle = "Seleccioná monedas y un período para comparar";
+    private string lineChartTitle = "";
+    private string lineChartSubtitle = "";
     private string selectedCoinName = "Bitcoin";
     private bool lineChartEmpty = false;
     private bool showLineChart = false;
@@ -1164,24 +1201,19 @@
     private Dictionary<string, string> coinWarnings = new(); // advertencias por moneda
     private string? filterError = null;
 
-    private static readonly List<(string Symbol, string Name)> _staticComparisonCoins = new()
-    {
-        ("BTC", "Bitcoin"),
-        ("ETH", "Ethereum"),
-        ("BNB", "BNB"),
-        ("SOL", "Solana"),
-        ("ADA", "Cardano"),
-        ("XRP", "XRP"),
-    };
+    [CascadingParameter(Name = "AuthInitialized")] bool AuthInitialized { get; set; } = true;
 
     protected override async Task OnInitializedAsync()
     {
+        if (!AuthInitialized) return;
         if (!AuthStateSvc.IsAuthenticated())
         {
             Nav.NavigateTo("/login", forceLoad: true);
             return;
         }
         await LoadData();
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+        RebuildLocalizedChartTexts();
     }
 
     private DotNetObjectReference<Stats>? _dotNetRef;
@@ -1200,6 +1232,13 @@
         {
             _chartsRendered = true;
             await RenderCharts();
+        }
+
+        if (_refreshChartsAfterLanguageChange)
+        {
+            _refreshChartsAfterLanguageChange = false;
+            if (cryptos.Any())
+                await RenderCharts();
         }
 
         if (!isLoading)
@@ -1248,7 +1287,72 @@
 
     public void Dispose()
     {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
         _dotNetRef?.Dispose();
+    }
+
+    private bool _refreshChartsAfterLanguageChange;
+
+    private void HandleLanguageChanged()
+    {
+        RebuildLocalizedChartTexts();
+        _refreshChartsAfterLanguageChange = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string CoinsLabel(int count)
+    {
+        return count == 1
+            ? Loc["stats.coins.one"]
+            : Loc.Format("stats.coins.many", count);
+    }
+
+    private void RebuildLocalizedChartTexts()
+    {
+        if (!hasCompared || !multiHistoricalData.Any())
+        {
+            lineChartTitle = Loc["stats.chart.defaultTitle"];
+            lineChartSubtitle = Loc["stats.chart.defaultSubtitle"];
+            return;
+        }
+
+        var coinsWithData = multiHistoricalData
+            .Where(kv => kv.Value.Any())
+            .Select(kv => kv.Key)
+            .ToList();
+
+        var fromDate = compareFrom ?? DateTime.Today.AddDays(-30);
+        var toDate = compareTo ?? DateTime.Today;
+
+        if (coinsWithData.Count == 1)
+        {
+            var coinName = GetAvailableComparisonCoins()
+                .Where(c => c.Symbol.Equals(coinsWithData[0], StringComparison.OrdinalIgnoreCase))
+                .Select(c => c.Name).FirstOrDefault() ?? coinsWithData[0];
+
+            lineChartTitle = Loc.Format("stats.chart.singleTitle", coinName);
+            lineChartSubtitle = Loc.Format("stats.chart.singleSubtitle",
+                coinName,
+                fromDate.ToString("dd/MM/yyyy"),
+                toDate.ToString("dd/MM/yyyy"));
+        }
+        else
+        {
+            var n = coinsWithData.Count;
+            var coinList = n > 1
+                ? string.Join(", ", coinsWithData.Take(n - 1)) + " y " + coinsWithData.Last()
+                : coinsWithData.FirstOrDefault() ?? "";
+
+            lineChartTitle = chartMode == "percent"
+                ? Loc.Format("stats.chart.percentTitle", CoinsLabel(n))
+                : Loc.Format("stats.chart.evolutionTitle", CoinsLabel(n));
+
+            lineChartSubtitle = n >= 2
+                ? Loc.Format("stats.chart.compareSubtitle", coinList,
+                    fromDate.ToString("dd/MM/yyyy"), toDate.ToString("dd/MM/yyyy"))
+                : Loc.Format("stats.chart.singleSubtitle", coinList,
+                    fromDate.ToString("dd/MM/yyyy"), toDate.ToString("dd/MM/yyyy"));
+        }
     }
 
     private async Task LoadData()
@@ -1256,10 +1360,20 @@
         try
         {
             isLoading = true;
-            cryptos = await DbContext.CryptoCurrencies
-                .Where(c => c.IsActive)
-                .OrderByDescending(c => c.MarketCap)
-                .ToListAsync();
+            var userId = AuthStateSvc.GetCurrentUserId();
+            if (userId.HasValue)
+                cryptos = await FavoriteCryptoSvc.GetFavoriteCryptosAsync(userId.Value);
+            else
+                cryptos = new List<CryptoCurrency>();
+
+            // Limpiar selección de monedas que ya no están en favoritos
+            if (selectedCoins.Any())
+            {
+                var validSymbols = cryptos.Select(c => c.Symbol.ToUpper()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var toRemove = selectedCoins.Where(s => !validSymbols.Contains(s)).ToList();
+                foreach (var s in toRemove)
+                    selectedCoins.Remove(s);
+            }
         }
         finally
         {
@@ -1278,7 +1392,9 @@
                 var symbols = cryptos.Select(c => c.Symbol.ToUpper()).ToArray();
                 var changes = cryptos.Select(c => (double)c.Change24h).ToArray();
                 await JSRuntime.InvokeVoidAsync("renderPieChart", "pieChart", cryptoNames, marketCaps);
-                await JSRuntime.InvokeVoidAsync("renderBarChart", "barChart", symbols, changes);
+                var barTitle = Loc["stats.chart.barTitle"];
+                await JSRuntime.InvokeVoidAsync("renderBarChart", "barChart", symbols, changes, barTitle, Loc["stats.chart.xAxis.coin"],
+Loc["stats.chart.yAxis.change24h"]);
             }
         }
         catch (Exception ex)
@@ -1351,13 +1467,13 @@
         else
             median = (sorted[n / 2 - 1] + sorted[n / 2]) / 2m;
 
-        result.Add(("Media (Promedio)", $"${stats.Mean:N2}", ""));
-        result.Add(("Mediana", $"${median:N2}", ""));
-        result.Add(("Precio Mínimo", $"${stats.Min:N2}", "analytics-down"));
-        result.Add(("Precio Máximo", $"${stats.Max:N2}", "analytics-up"));
-        result.Add(("Rango de Precios", $"${(stats.Max - stats.Min):N2}", ""));
-        result.Add(("Desviación Estándar", $"${stats.StdDev:N2}", ""));
-        result.Add(("Coef. de Variación", $"{cv:F2}%", ""));
+        result.Add((Loc["stats.statsLabel.mean"], $"${stats.Mean:N2}", ""));
+        result.Add((Loc["stats.statsLabel.median"], $"${median:N2}", ""));
+        result.Add((Loc["stats.statsLabel.min"], $"${stats.Min:N2}", "analytics-down"));
+        result.Add((Loc["stats.statsLabel.max"], $"${stats.Max:N2}", "analytics-up"));
+        result.Add((Loc["stats.statsLabel.range"], $"${(stats.Max - stats.Min):N2}", ""));
+        result.Add((Loc["stats.statsLabel.stdDev"], $"${stats.StdDev:N2}", ""));
+        result.Add((Loc["stats.statsLabel.cv"], $"{cv:F2}%", ""));
 
         return result;
     }
@@ -1395,13 +1511,8 @@
 
     private IEnumerable<(string Symbol, string Name)> GetAvailableComparisonCoins()
     {
-        var result = new List<(string Symbol, string Name)>(_staticComparisonCoins);
-        foreach (var c in cryptos)
-        {
-            if (!result.Any(r => r.Symbol.Equals(c.Symbol, StringComparison.OrdinalIgnoreCase)))
-                result.Add((c.Symbol.ToUpper(), c.Name));
-        }
-        return result;
+        // cryptos ya contiene SOLO las monedas del usuario actual (cargadas por FavoriteCryptoService)
+        return cryptos.Select(c => (c.Symbol.ToUpper(), c.Name));
     }
 
     private void ToggleCoinSelection(string symbol)
@@ -1451,10 +1562,23 @@
 
         filterError = null;
 
+        // Validar que solo se seleccionen monedas que el usuario sigue
+        var validSymbols = cryptos.Select(c => c.Symbol.ToUpper()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var invalidCoins = selectedCoins.Where(s => !validSymbols.Contains(s)).ToList();
+        foreach (var s in invalidCoins)
+            selectedCoins.Remove(s);
+
+        if (!selectedCoins.Any())
+        {
+            filterError = Loc["stats.error.selectFromList"];
+            StateHasChanged();
+            return;
+        }
+
         // Validar: al menos 1 moneda
         if (selectedCoins.Count < 1)
         {
-            filterError = "Seleccioná al menos una moneda para comparar.";
+            filterError = Loc["stats.error.selectAtLeastOne"];
             StateHasChanged();
             return;
         }
@@ -1462,7 +1586,7 @@
         // Validar: fecha desde y hasta son obligatorias
         if (!compareFrom.HasValue || !compareTo.HasValue)
         {
-            filterError = "Seleccioná un período válido (fecha desde y hasta).";
+            filterError = Loc["stats.error.validPeriod"];
             StateHasChanged();
             return;
         }
@@ -1470,7 +1594,7 @@
         // Validar: fecha desde ≤ fecha hasta
         if (compareFrom.Value.Date > compareTo.Value.Date)
         {
-            filterError = "La fecha 'Desde' no puede ser posterior a la fecha 'Hasta'.";
+            filterError = Loc["stats.error.dateOrder"];
             StateHasChanged();
             return;
         }
@@ -1478,7 +1602,7 @@
         // Validar: no fechas futuras
         if (compareFrom.Value.Date > DateTime.Today)
         {
-            filterError = "La fecha 'Desde' no puede ser futura.";
+            filterError = Loc["stats.error.futureDate"];
             StateHasChanged();
             return;
         }
@@ -1580,8 +1704,7 @@
                 var rangeDesc = fromDate == toDate
                     ? $"el día {fromDate:dd/MM/yyyy}"
                     : $"el período {fromDate:dd/MM/yyyy} – {toDate:dd/MM/yyyy}";
-                filterError = $"No se encontraron datos para ninguna de las monedas seleccionadas en {rangeDesc}. " +
-                              "Verificá que las fechas sean correctas o probá con otro rango.";
+                filterError = Loc.Format("stats.error.noData", rangeDesc);
                 Console.WriteLine($"[Stats] ⛔ Sin datos para ninguna moneda — {filterError}");
                 StateHasChanged();
                 return;
@@ -1597,22 +1720,23 @@
                 var coinName = GetAvailableComparisonCoins()
                     .Where(c => c.Symbol.Equals(coinsWithData[0], StringComparison.OrdinalIgnoreCase))
                     .Select(c => c.Name).FirstOrDefault() ?? coinsWithData[0];
-                lineChartTitle = $"Evolución histórica de {coinName}";
-                lineChartSubtitle = $"Precio de {coinName} — {fromDate:dd/MM/yyyy} a {toDate:dd/MM/yyyy}";
+                lineChartTitle = Loc.Format("stats.chart.singleTitle", coinName);
+                lineChartSubtitle = Loc.Format("stats.chart.singleSubtitle", coinName, fromDate.ToString("dd/MM/yyyy"),
+toDate.ToString("dd/MM/yyyy"));
             }
             else
             {
                 var n = coinsWithData.Count;
-                var label = $"{n} moneda{(n != 1 ? "s" : "")}";
+                var label = CoinsLabel(n);
                 var coinList = n > 1
                     ? string.Join(", ", coinsWithData.Take(n - 1)) + " y " + coinsWithData.Last()
                     : coinsWithData.FirstOrDefault() ?? "";
                 lineChartTitle = chartMode == "percent"
-                    ? $"Rendimiento porcentual ({label})"
-                    : $"Evolución histórica ({label})";
+                    ? Loc.Format("stats.chart.percentTitle", label)
+                    : Loc.Format("stats.chart.evolutionTitle", label);
                 lineChartSubtitle = n >= 2
-                    ? $"Comparativa de {coinList} — {fromDate} a {toDate}"
-                    : $"Precio de {coinList} — {fromDate} a {toDate}";
+                    ? Loc.Format("stats.chart.compareSubtitle", coinList, fromDate.ToString("dd/MM/yyyy"), toDate.ToString("dd/MM/yyyy"))
+                    : Loc.Format("stats.chart.singleSubtitle", coinList, fromDate.ToString("dd/MM/yyyy"), toDate.ToString("dd/MM/yyyy"));
             }
 
             StateHasChanged();
@@ -1626,7 +1750,7 @@
             {
                 var pieLabels = coinsWithData.ToArray();
                 var pieCaps = coinsWithData.Select(s => marketCapData.ContainsKey(s) ? (double)marketCapData[s].Today : 0.0).ToArray();
-                await JSRuntime.InvokeVoidAsync("renderPieChart", "pieChart", pieLabels, pieCaps, "Market Cap por moneda");
+                await JSRuntime.InvokeVoidAsync("renderPieChart", "pieChart", pieLabels, pieCaps, Loc["stats.chart.pieTitle"]);
             }
             else
             {
@@ -1636,12 +1760,14 @@
             // Bar chart
             var barLabels = coinsWithData.ToArray();
             var barData = coinsWithData.Select(s => change24hData.ContainsKey(s) ? (double)change24hData[s] : 0.0).ToArray();
-            await JSRuntime.InvokeVoidAsync("renderBarChart", "barChart", barLabels, barData);
+            var barTitle = Loc["stats.chart.barTitle"];
+            await JSRuntime.InvokeVoidAsync("renderBarChart", "barChart", barLabels, barData, barTitle,
+Loc["stats.chart.xAxis.coin"], Loc["stats.chart.yAxis.change24h"]);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Stats] ⛔ Excepción en ApplyComparison: {ex.Message}\n{ex.StackTrace}");
-            filterError = $"Error inesperado al cargar datos: {ex.Message}";
+            filterError = Loc.Format("stats.error.unexpected", ex.Message);
             lineChartEmpty = true;
             showLineChart = false;
         }
@@ -1666,7 +1792,7 @@
         if (coinsWithData.Count >= 1)
         {
             var n = coinsWithData.Count;
-            var label = $"{n} moneda{(n != 1 ? "s" : "")}";
+            var label = CoinsLabel(n);
             var coinList = n > 1
                 ? string.Join(", ", coinsWithData.Take(n - 1)) + " y " + coinsWithData.Last()
                 : coinsWithData.FirstOrDefault() ?? "";
@@ -1728,8 +1854,7 @@
             {
                 lineChartEmpty = true;
                 showLineChart = false;
-                filterError = "No hay suficientes datos históricos para graficar la evolución. " +
-                              "Seleccioná un período de al menos 2 días.";
+                filterError = Loc["stats.error.insufficient"];
                 Console.WriteLine("[Stats] ⛔ Menos de 2 fechas con datos — no se puede graficar.");
                 await JSRuntime.InvokeVoidAsync("destroyChart", "lineChart");
                 StateHasChanged();
@@ -1757,7 +1882,7 @@
                 }).ToArray();
 
                 await JSRuntime.InvokeVoidAsync("renderLineChartMulti", "lineChart", commonLabels, lineDatasets, lineChartTitle,
-"percent");
+"percent", Loc["stats.chart.xAxis.date"], Loc["stats.chart.yAxis.yieldPct"]);
             }
             else
             {
@@ -1775,7 +1900,7 @@
                 }).ToArray();
 
                 await JSRuntime.InvokeVoidAsync("renderLineChartMulti", "lineChart", commonLabels, lineDatasets, lineChartTitle,
-"price");
+"price", Loc["stats.chart.xAxis.date"], Loc["stats.chart.yAxis.priceUsd"]);
             }
         }
         catch (Exception ex)

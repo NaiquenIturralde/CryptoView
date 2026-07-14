@@ -5,3 +5,4 @@ publish/
 *.user
 *.suo
 Properties/PublishProfiles/
+appsettings.Development.json

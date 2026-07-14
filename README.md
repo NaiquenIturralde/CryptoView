@@ -101,6 +101,7 @@ Los tres valores `--bg-*` definen los tres niveles de fondo de la aplicación: f
 Esta sección queda preparada para incluir material visual del proyecto en funcionamiento.
 
 - Link al video demo: (https://youtu.be/8zhTYH3Q0sg)
+- Probar la app: (https://cryptoview.runasp.net/login)
 
 ---
 

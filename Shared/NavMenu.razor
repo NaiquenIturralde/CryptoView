@@ -1,3 +1,6 @@
+@inject CryptoView.Services.LocalizacionService Loc
+@implements IDisposable
+
 <div class="nav-menu">
     <NavLink href="" Match="NavLinkMatch.All" class="sidebar-brand-link brand-link" @onclick="HandleNavClick">
         <div class="sidebar-brand">
@@ -14,22 +17,22 @@
                           class="brand-eye-chart" />
             </svg>
             <div class="brand-name">CryptoView</div>
-            <div class="brand-subtitle">Dashboard Educativo</div>
+            <div class="brand-subtitle">@Loc["nav.dashboardSubtitle"]</div>
         </div>
     </NavLink>
     <hr class="sidebar-brand-separator" />
 
     <nav class="sidebar-menu">
-        <NavLink class="sidebar-item" href="" Match="NavLinkMatch.All" @onclick="HandleNavClick">
-            <i class="bi bi-speedometer2"></i> Dashboard
+        <NavLink class="sidebar-item" href="" Match="NavLinkMatch.All" @onclick="HandleNavClick" data-tutorial="nav-dashboard">
+            <i class="bi bi-speedometer2"></i> @Loc["nav.dashboard"]
         </NavLink>
 
-        <NavLink class="sidebar-item" href="cryptolist" @onclick="HandleNavClick">
-            <i class="bi bi-list-ul"></i> Mis Criptomonedas
+        <NavLink class="sidebar-item" href="cryptolist" @onclick="HandleNavClick" data-tutorial="nav-cryptos">
+            <i class="bi bi-list-ul"></i> @Loc["nav.myCryptos"]
         </NavLink>
 
-        <NavLink class="sidebar-item" href="stats" @onclick="HandleNavClick">
-            <i class="bi bi-graph-up-arrow"></i> Estadísticas
+        <NavLink class="sidebar-item" href="stats" @onclick="HandleNavClick" data-tutorial="nav-stats">
+            <i class="bi bi-graph-up-arrow"></i> @Loc["nav.stats"]
         </NavLink>
     </nav>
 </div>
@@ -37,6 +40,19 @@
 @code {
     [Parameter]
     public EventCallback OnNavigationRequested { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+    }
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
+    }
+
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
 
     private async Task HandleNavClick()
     {

@@ -1,95 +1,152 @@
 @page "/ayuda"
 @inject NavigationManager Nav
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.LocalizacionService Loc
+@inject CryptoView.Services.TutorialService TutorialSvc
+@implements IDisposable
 
-<PageTitle>Ayuda - CryptoView</PageTitle>
+<PageTitle>@Loc["help.pageTitle"] - CryptoView</PageTitle>
 
 <div class="page-container help-container">
     <!-- Page Header -->
     <div class="page-header">
-        <h1 class="display-5 fw-bold text-warning mb-1">Ayuda</h1>
-        <p class="text-muted lead mb-0">Todo lo que necesitás saber para usar CryptoView</p>
+        <h1 class="display-5 fw-bold text-warning mb-1">@Loc["help.title"]</h1>
+        <p class="text-muted lead mb-0">@Loc["help.subtitle"]</p>
     </div>
 
     <!-- Card 1: Dashboard -->
     <div class="help-card">
         <div class="help-card-title">
-            <i class="bi bi-speedometer2"></i> ¿Qué muestra el dashboard?
+            <i class="bi bi-speedometer2"></i> @Loc["help.card1.title"]
         </div>
-        <p>El dashboard es tu vista principal de seguimiento. Muestra en tiempo real las criptomonedas que agregaste a
-            tu lista personal.</p>
-            <ul>
-                <li><strong>Total Monedas</strong> — cuántas criptos estás monitoreando.</li>
-                <li><strong>En Alza</strong> — cuántas tienen variación positiva en las últimas 24 horas.</li>
-                <li><strong>En Baja</strong> — cuántas tuvieron una caída en las últimas 24 horas.</li>
-                <li><strong>Cambio Promedio</strong> — el promedio del porcentaje de cambio de toda tu cartera.</li>
-                <li>Cada tarjeta muestra precio actual, variación 24h, market cap y volumen.</li>
-            </ul>
-        </div>
+        <p>@Loc["help.card1.desc"]</p>
+        <ul>
+            <li><strong>@Loc["help.card1.totalCoins"]</strong> — @Loc["help.card1.totalCoinsDesc"]</li>
+            <li><strong>@Loc["help.card1.trendingUp"]</strong> — @Loc["help.card1.trendingUpDesc"]</li>
+            <li><strong>@Loc["help.card1.trendingDown"]</strong> — @Loc["help.card1.trendingDownDesc"]</li>
+            <li><strong>@Loc["help.card1.avgChange"]</strong> — @Loc["help.card1.avgChangeDesc"]</li>
+            <li>@Loc["help.card1.info"]</li>
+        </ul>
+    </div>
 
-        <!-- Card 2: En Alza / En Baja -->
-        <div class="help-card">
-            <div class="help-card-title">
-                <i class="bi bi-bar-chart-line"></i> ¿Qué significa "En alza" y "En baja"?
+    <!-- Card 2: En Alza / En Baja -->
+    <div class="help-card">
+        <div class="help-card-title">
+            <i class="bi bi-bar-chart-line"></i> @Loc["help.card2.title"]
+        </div>
+        <p>@Loc["help.card2.desc"]</p>
+        <div class="d-flex gap-3 flex-wrap mb-2">
+            <span class="help-badge help-badge-up">
+                <i class="bi bi-arrow-up"></i> @Loc["help.card2.badgeUp"]
+            </span>
+            <span class="help-badge help-badge-down">
+                <i class="bi bi-arrow-down"></i> @Loc["help.card2.badgeDown"]
+            </span>
+        </div>
+        <ul>
+            <li>@((MarkupString)Loc["help.card2.positiveDesc"])</li>
+            <li>@((MarkupString)Loc["help.card2.negativeDesc"])</li>
+            <li>@Loc["help.card2.coinGecko"]</li>
+        </ul>
+    </div>
+
+    <!-- Card 3: Actualizar Precios -->
+    <div class="help-card">
+        <div class="help-card-title">
+            <i class="bi bi-arrow-clockwise"></i> @Loc["help.card3.title"]
+        </div>
+        <p>@Loc["help.card3.desc"]</p>
+        <ul>
+            <li>@Loc["help.card3.item1"]</li>
+            <li>@Loc["help.card3.item2"]</li>
+            <li>@Loc["help.card3.item3"]</li>
+            <li>@Loc["help.card3.item4"]</li>
+        </ul>
+    </div>
+
+    <!-- Card 4: Frecuencia de datos -->
+    <div class="help-card">
+        <div class="help-card-title">
+            <i class="bi bi-clock-history"></i> @Loc["help.card4.title"]
+        </div>
+        <p>@((MarkupString)Loc["help.card4.desc"])</p>
+        <ul>
+            <li>@Loc["help.card4.item1"]</li>
+            <li>@Loc["help.card4.item2"]</li>
+            <li>@Loc["help.card4.item3"]</li>
+        </ul>
+    </div>
+
+    <!-- ═══ Recorrido Guiado ═══ -->
+    <div class="help-card">
+        <div class="help-card-title">
+            <i class="bi bi-signpost-split"></i> @Loc["help.tour.title"]
+        </div>
+        <p>@Loc["help.tour.desc"]</p>
+
+        <button class="btn btn-outline-warning mt-2" @onclick="RestartTour">
+            <i class="bi bi-play-circle me-1"></i>@Loc["help.tour.button"]
+        </button>
+
+        @if (_resetConfirmed)
+        {
+            <div class="mt-2 text-success" style="font-size:0.85rem;">
+                <i class="bi bi-check-circle-fill me-1"></i>@Loc["help.tour.resetConfirm"]
             </div>
-            <p>Estos indicadores reflejan la variación del precio en las últimas <strong>24 horas</strong>, expresada en
-                porcentaje.</p>
-                <div class="d-flex gap-3 flex-wrap mb-2">
-                    <span class="help-badge help-badge-up">
-                        <i class="bi bi-arrow-up"></i> En alza
-                    </span>
-                    <span class="help-badge help-badge-down">
-                        <i class="bi bi-arrow-down"></i> En baja
-                    </span>
-                </div>
-                <ul>
-                    <li>Un badge <span class="help-badge help-badge-up" style="font-size:0.75rem; padding: 0.1rem 0.4rem;"><i
-                        class="bi bi-arrow-up"></i> positivo</span> indica que el precio subió respecto a ayer a la
-                        misma hora.</li>
-                        <li>Un badge <span class="help-badge help-badge-down" style="font-size:0.75rem; padding: 0.1rem 0.4rem;"><i
-                            class="bi bi-arrow-down"></i> negativo</span> indica una caída de precio en ese período.</li>
-                            <li>El porcentaje mostrado es el <em>change_percentage_24h</em> provisto por la API de CoinGecko.</li>
-                        </ul>
-                    </div>
+        }
+    </div>
+</div>
 
-                    <!-- Card 3: Actualizar Precios -->
-                    <div class="help-card">
-                        <div class="help-card-title">
-                            <i class="bi bi-arrow-clockwise"></i> ¿Cómo funciona "Actualizar Precios"?
-                        </div>
-                        <p>El botón <strong>Actualizar Precios</strong> del dashboard realiza una consulta en tiempo real a la API de
-                            CoinGecko para cada criptomoneda de tu lista.</p>
-                            <ul>
-                                <li>Los precios, variaciones y volúmenes se actualizan con los datos más recientes del mercado.</li>
-                                <li>El proceso puede tardar unos segundos dependiendo de la cantidad de monedas en tu lista.</li>
-                                <li>Durante la actualización, el botón muestra "Actualizando..." y queda deshabilitado para evitar llamadas
-                                    duplicadas.</li>
-                                    <li>Al finalizar, se muestra el timestamp de la última actualización en el pie del dashboard.</li>
-                                </ul>
-                            </div>
+<style>
+    .tutorial-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 0.85rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: var(--radius-sm, 8px);
+        transition: background 0.15s ease;
+    }
 
-                            <!-- Card 4: Frecuencia de datos -->
-                            <div class="help-card">
-                                <div class="help-card-title">
-                                    <i class="bi bi-clock-history"></i> ¿Con qué frecuencia se actualizan los datos?
-                                </div>
-                                <p>Los datos <strong>no se actualizan solos</strong> a menos que actives la actualización automática en <a
-                                    href="preferencias" class="text-warning">Preferencias</a>.</p>
-                                    <ul>
-                                        <li>De forma manual: presionando "Actualizar Precios" en el dashboard o "Actualizar Todos" en Mis
-                                            Criptomonedas.</li>
-                                            <li>La API de CoinGecko (plan gratuito) permite hasta <strong>10–30 llamadas por minuto</strong>. Refrescar
-                                                con demasiada frecuencia puede generar errores temporales.</li>
-                                                <li>Para un dashboard educativo se recomienda actualizar cada 5 o 10 minutos.</li>
-                                            </ul>
-                                        </div>
-                                    </div>
+    .tutorial-row:hover {
+        background: rgba(255, 122, 0, 0.06);
+    }
+
+    .tutorial-row-label {
+        font-size: 0.9rem;
+        color: var(--text-primary, #E5E7EB);
+        font-weight: 500;
+    }
+</style>
+
 @code {
+    [CascadingParameter(Name = "AuthInitialized")] bool AuthInitialized { get; set; } = true;
+
+    private bool _resetConfirmed = false;
+
     protected override async Task OnInitializedAsync()
     {
+        Loc.OnLanguageChanged += HandleLanguageChanged;
+
+        if (!AuthInitialized) return;
         if (!AuthStateSvc.IsAuthenticated())
         {
             Nav.NavigateTo("/login", forceLoad: true);
         }
+    }
+
+    private async Task RestartTour()
+    {
+        await TutorialSvc.ResetTutorialAsync("main-tour");
+        Nav.NavigateTo("/");
+    }
+
+    private void HandleLanguageChanged()
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Loc.OnLanguageChanged -= HandleLanguageChanged;
     }
 }

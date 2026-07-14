@@ -3,6 +3,8 @@
 @inject HttpClient Http
 @inject NotificationService NotificationSvc
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.FavoriteCryptoService FavoriteCryptoSvc
+@inject CryptoView.Services.LocalizacionService Loc
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 
@@ -13,13 +15,13 @@
     <div class="dashboard-header mb-4">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <h1 class="dashboard-title">Dashboard Principal</h1>
-                <p class="dashboard-subtitle">Monitoreo en tiempo real de criptomonedas</p>
+                <h1 class="dashboard-title">@Loc["dashboard.title"]</h1>
+                <p class="dashboard-subtitle">@Loc["dashboard.subtitle"]</p>
             </div>
             <div>
                 <button class="btn btn-primary btn-lg" @onclick="RefreshAllPrices" disabled="@isLoading">
                     <i class="bi bi-arrow-clockwise @(isLoading ? "spin" : "")"></i>
-                    @(isLoading ? "Actualizando..." : "Actualizar Precios")
+                    @(isLoading ? Loc["dashboard.updating"] : Loc["dashboard.updatePrices"])
                 </button>
             </div>
         </div>
@@ -29,19 +31,19 @@
     {
         <div class="text-center py-5">
             <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Cargando...</span>
+                <span class="visually-hidden">@Loc["dashboard.loadingSR"]</span>
             </div>
-            <p class="mt-3 text-light">Cargando criptomonedas...</p>
+            <p class="mt-3 text-light">@Loc["dashboard.loading"]</p>
         </div>
     }
     else if (cryptos.Count == 0)
     {
         <div class="empty-state text-center py-5">
             <i class="bi bi-inbox display-1 text-muted"></i>
-            <h3 class="mt-3 text-light">No hay criptomonedas en tu lista</h3>
-            <p class="text-muted">Comienza agregando tus criptomonedas favoritas</p>
+            <h3 class="mt-3 text-light">@Loc["dashboard.emptyTitle"]</h3>
+            <p class="text-muted">@Loc["dashboard.emptySubtitle"]</p>
             <a href="/cryptolist" class="btn btn-primary mt-3">
-                <i class="bi bi-plus-circle"></i> Agregar Criptomonedas
+                <i class="bi bi-plus-circle"></i> @Loc["dashboard.addCryptos"]
             </a>
         </div>
     }
@@ -54,7 +56,7 @@
                     <i class="bi bi-wallet2"></i>
                 </div>
                 <div class="kpi-content">
-                    <span class="kpi-label">Total Monedas</span>
+                    <span class="kpi-label">@Loc["dashboard.totalCoins"]</span>
                     <span class="kpi-value">@cryptos.Count</span>
                 </div>
             </div>
@@ -63,7 +65,7 @@
                     <i class="bi bi-arrow-up-circle"></i>
                 </div>
                 <div class="kpi-content">
-                    <span class="kpi-label">En Alza</span>
+                    <span class="kpi-label">@Loc["dashboard.trendingUp"]</span>
                     <span class="kpi-value">@cryptos.Count(c => c.Change24h > 0)</span>
                 </div>
             </div>
@@ -72,7 +74,7 @@
                     <i class="bi bi-arrow-down-circle"></i>
                 </div>
                 <div class="kpi-content">
-                    <span class="kpi-label">En Baja</span>
+                    <span class="kpi-label">@Loc["dashboard.trendingDown"]</span>
                     <span class="kpi-value">@cryptos.Count(c => c.Change24h < 0)</span>
                 </div>
             </div>
@@ -81,9 +83,9 @@
                     <i class="bi bi-graph-up"></i>
                 </div>
                 <div class="kpi-content">
-                    <span class="kpi-label">Cambio Promedio</span>
+                    <span class="kpi-label">@Loc["dashboard.avgChange"]</span>
                     <span class="kpi-value">@((cryptos.Any() ? cryptos.Average(c => c.Change24h) :
-                                                                                                                                                                                                                                                                                                                                                                    0).ToString("F2"))%</span>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    0).ToString("F2"))%</span>
                     </div>
                 </div>
                 <div class="kpi-card kpi-green">
@@ -91,7 +93,7 @@
                         <i class="bi bi-trophy"></i>
                     </div>
                     <div class="kpi-content">
-                        <span class="kpi-label">Mayor Suba 24h</span>
+                        <span class="kpi-label">@Loc["dashboard.topGainer"]</span>
                         <span class="kpi-value">@GetTopGainer()</span>
                     </div>
                 </div>
@@ -100,7 +102,7 @@
                         <i class="bi bi-exclamation-diamond"></i>
                     </div>
                     <div class="kpi-content">
-                        <span class="kpi-label">Mayor Baja 24h</span>
+                        <span class="kpi-label">@Loc["dashboard.topLoser"]</span>
                         <span class="kpi-value">@GetTopLoser()</span>
                     </div>
                 </div>
@@ -126,25 +128,25 @@
                             <div class="cv-card-body">
                                 <div class="crypto-price">
                                     <h2 class="mb-0">$@crypto.CurrentPrice.ToString("N2")</h2>
-                                    <small class="text-muted">Precio actual USD</small>
+                                    <small class="text-muted">@Loc["dashboard.currentPrice"]</small>
                                 </div>
 
                                 <div class="crypto-details">
                                     <div class="detail-row">
                                         <span class="detail-label">
-                                            <i class="bi bi-cash-stack"></i> Market Cap
+                                            <i class="bi bi-cash-stack"></i> @Loc["dashboard.marketCap"]
                                         </span>
                                         <span class="detail-value">$@FormatLargeNumber(crypto.MarketCap)</span>
                                     </div>
                                     <div class="detail-row">
                                         <span class="detail-label">
-                                            <i class="bi bi-bar-chart"></i> Volumen 24h
+                                            <i class="bi bi-bar-chart"></i> @Loc["dashboard.volume24h"]
                                         </span>
                                         <span class="detail-value">$@FormatLargeNumber(crypto.Volume24h)</span>
                                     </div>
                                     <div class="detail-row">
                                         <span class="detail-label">
-                                            <i class="bi bi-clock"></i> Última actualización
+                                            <i class="bi bi-clock"></i> @Loc["dashboard.lastUpdate"]
                                         </span>
                                         <span class="detail-value">@GetTimeAgo(crypto.LastUpdated)</span>
                                     </div>
@@ -155,7 +157,7 @@
                             {
                                 <div class="cv-card-footer crypto-notes">
                                     <small class="text-info">
-                                        <i class="bi bi-sticky"></i> @crypto.Notes.Count nota(s)
+                                        <i class="bi bi-sticky"></i> @crypto.Notes.Count @Loc["dashboard.notes"]
                                     </small>
                                 </div>
                             }
@@ -171,13 +173,13 @@
             <div class="text-center mt-4 text-muted">
                 <small>
                     <i class="bi bi-info-circle"></i>
-                    Última actualización: @lastUpdate.Value.ToString("dd/MM/yyyy HH:mm:ss")
+                    @Loc["dashboard.lastUpdated"] @lastUpdate.Value.ToString("dd/MM/yyyy HH:mm:ss")
                 </small>
             </div>
         }
 
         <div class="app-author">
-            Desarrollado por Naiquen Iturralde ·
+            @Loc["dashboard.developedby"] ·
 
         </div>
     </div>
@@ -421,9 +423,11 @@
     private DateTime? lastUpdate;
 
     [Inject] private CryptoDbContext DbContext { get; set; } = default!;
+    [CascadingParameter(Name = "AuthInitialized")] bool AuthInitialized { get; set; } = true;
 
     protected override async Task OnInitializedAsync()
     {
+        if (!AuthInitialized) return;
         if (!AuthStateSvc.IsAuthenticated())
         {
             Nav.NavigateTo("/login", forceLoad: true);
@@ -432,15 +436,20 @@
         await LoadCryptoCurrencies();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+    }
+
     private async Task LoadCryptoCurrencies()
     {
         try
         {
             isLoading = true;
-            cryptos = await DbContext.CryptoCurrencies
-                .Include(c => c.Notes)
-                .Where(c => c.IsActive)
-                .ToListAsync();
+            var userId = AuthStateSvc.GetCurrentUserId();
+            if (userId.HasValue)
+                cryptos = await FavoriteCryptoSvc.GetFavoriteCryptosAsync(userId.Value);
+            else
+                cryptos = new List<CryptoCurrency>();
             lastUpdate = DateTime.Now;
         }
         catch (Exception ex)
