@@ -3,6 +3,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @inject CryptoView.Services.AuthStateService AuthStateSvc
+@inject CryptoView.Services.FavoriteCryptoService FavoriteCryptoSvc
 @inject CryptoView.Services.LocalizacionService Loc
 @implements IDisposable
 @using Microsoft.EntityFrameworkCore
@@ -188,9 +189,20 @@
         }
         // DB queries are safe during prerendering (no JS interop)
         try { cryptos = await DbContext.CryptoCurrencies.ToListAsync(); } catch { cryptos = new(); }
-        displayedCryptos = cryptos;
         // userId is server-side — safe during prerendering
         _currentUserId = AuthStateSvc.GetCurrentUserId() ?? 0;
+
+        // Favoritos activos: SIEMPRE desde UserFavorites (Fase 2).
+        // El JSON de localStorage ya no es fuente para esta funcionalidad.
+        if (_currentUserId > 0)
+        {
+            try { displayedCryptos = await FavoriteCryptoSvc.GetFavoriteCryptosAsync(_currentUserId); }
+            catch { displayedCryptos = new List<CryptoCurrency>(); }
+        }
+        else
+        {
+            displayedCryptos = new List<CryptoCurrency>();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -239,17 +251,17 @@
                         displayMoneda = !string.IsNullOrWhiteSpace(d.Moneda) ? d.Moneda : "";
                         avatarIcon = (!string.IsNullOrWhiteSpace(d.AvatarIcon) && photoDataUrl == null) ? d.AvatarIcon : null;
 
-                        if (d.FavoriteCryptoIds?.Length > 0)
-                            displayedCryptos = cryptos.Where(c => d.FavoriteCryptoIds.Contains(c.Id)).ToList();
-                        else
-                            displayedCryptos = new List<CryptoCurrency>();
+                        // Favoritos: NO se leen del localStorage — vienen de UserFavorites,
+                        // cargados en OnInitializedAsync vía FavoriteCryptoService (Fase 2).
                     }
                 }
                 catch { /* si el JSON está corrupto, deja campos vacíos */ }
             }
             else
             {
-                // Si no hay datos, mostrar perfil vacío/controlado
+                // Si no hay datos, mostrar perfil vacío/controlado.
+                // displayedCryptos se mantiene con lo cargado desde UserFavorites
+                // en OnInitializedAsync (Fase 2) — localStorage no es fuente de favoritos.
                 displayName = Loc["profile.notCompleted"];
                 displayUsername = currentUsername ?? "";
                 displayEmail = "";
@@ -257,7 +269,6 @@
                 displayPais = "";
                 displayMoneda = "";
                 avatarIcon = null;
-                displayedCryptos = new List<CryptoCurrency>();
             }
 
             StateHasChanged();
@@ -279,9 +290,16 @@
         _ => role ?? string.Empty
     };
 
+    // ProfileDataDto: cache de localStorage SOLO para campos visuales del perfil
+    // (nombre, bio, país, moneda, avatar). Los favoritos NO se leen de aquí.
     private record ProfileDataDto(
-        string? Nombre, string? Apellido, string? Email, string? Username,
-        string? Bio, string? Pais, string? Moneda, string? AvatarIcon,
-        int[]? FavoriteCryptoIds);
+        string? Nombre,
+        string? Apellido,
+        string? Email,
+        string? Username,
+        string? Bio,
+        string? Pais,
+        string? Moneda,
+        string? AvatarIcon
+    );
 }
-

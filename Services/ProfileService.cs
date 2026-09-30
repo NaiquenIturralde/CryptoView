@@ -41,8 +41,7 @@ namespace CryptoView.Services
                     profile.FullName,
                     profile.Email,
                     profile.Bio,
-                    profile.Country,
-                    profile.FavoriteCryptoIds
+                    profile.Country
                 );
             }
             catch (Exception ex)
@@ -56,6 +55,8 @@ namespace CryptoView.Services
         /// Saves or updates user profile.
         /// Validates required fields and email format.
         /// Returns (true, empty string) on success or (false, errorMessage) on validation failure.
+
+
         /// </summary>
         public async Task<(bool success, string errorMessage)> SaveUserProfileAsync(int userId, ProfileDto dto)
         {
@@ -82,7 +83,6 @@ namespace CryptoView.Services
                         Email = dto.Email ?? string.Empty,
                         Bio = dto.Bio,
                         Country = dto.Country,
-                        FavoriteCryptoIds = dto.FavoriteCryptoIds,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -95,7 +95,6 @@ namespace CryptoView.Services
                     profile.Email = dto.Email ?? string.Empty;
                     profile.Bio = dto.Bio;
                     profile.Country = dto.Country;
-                    profile.FavoriteCryptoIds = dto.FavoriteCryptoIds;
                     profile.UpdatedAt = DateTime.UtcNow;
                     _logger.LogInformation($"[ProfileService] Updating existing profile for UserId {userId}");
                 }
@@ -153,8 +152,7 @@ namespace CryptoView.Services
             string? FullName,
             string? Email,
             string? Bio,
-            string? Country,
-            string? FavoriteCryptoIds
+            string? Country
         );
     }
 }

@@ -5,6 +5,7 @@
 @inject CryptoView.Services.ProfileService ProfileSvc
 @inject CryptoView.Services.AuthStateService AuthStateSvc
 @inject CryptoView.Services.LocalizacionService Loc
+@inject CryptoView.Services.FavoriteCryptoService FavoriteCryptoSvc
 @implements IDisposable
 @using Microsoft.EntityFrameworkCore
 @using System.Text.Json
@@ -326,7 +327,19 @@
             // 1. Cargar datos del servidor vía API (fuente de verdad para nombre/email/bio/pais)
             await LoadProfileFromServer();
 
+            // 1b. Favoritos: SIEMPRE desde UserFavorites (Fase 2) — fuente de verdad relacional
+            if (_currentUserId > 0)
+            {
+                try
+                {
+                    var dbFavIds = await FavoriteCryptoSvc.GetFavoriteCryptoIdsAsync(_currentUserId);
+                    foreach (var fid in dbFavIds) favoriteCryptoIds.Add(fid);
+                }
+                catch { /* si falla la lectura, se muestran como no seleccionados */ }
+            }
+
             // 2. Intentar cargar datos desde localStorage como complemento o fallback
+            // (solo para campos de perfil — NO para favoritos)
             if (!string.IsNullOrEmpty(_currentUsername))
             {
                 var lsKey = $"cv_profile_data_{_currentUsername}";
@@ -353,13 +366,7 @@
                         if (lsData.TryGetProperty("AvatarIcon", out var aiProp) && !string.IsNullOrEmpty(aiProp.GetString()))
                             selectedAvatarIcon = aiProp.GetString();
 
-                        // Favoritos: cargar desde localStorage si el API no los proveyó
-                        if (favoriteCryptoIds.Count == 0 && lsData.TryGetProperty("FavoriteCryptoIds", out var favProp)
-                            && favProp.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var item in favProp.EnumerateArray())
-                                if (item.TryGetInt32(out var fid)) favoriteCryptoIds.Add(fid);
-                        }
+                       
                     }
                     catch { /* datos en localStorage con formato incorrecto, se ignoran */ }
                 }
@@ -405,16 +412,9 @@
                 if (!string.IsNullOrWhiteSpace(profileDto.Bio)) bio = profileDto.Bio;
                 if (!string.IsNullOrWhiteSpace(profileDto.Country)) pais = profileDto.Country;
 
-                // Cargar criptomonedas favoritas
-                if (!string.IsNullOrWhiteSpace(profileDto.FavoriteCryptoIds))
-                {
-                    try
-                    {
-                        var ids = JsonSerializer.Deserialize<List<int>>(profileDto.FavoriteCryptoIds);
-                        if (ids != null) foreach (var id in ids) favoriteCryptoIds.Add(id);
-                    }
-                    catch { /* formato inválido, se ignora */ }
-                }
+               
+                // Se leen exclusivamente de UserFavorites vía FavoriteCryptoService
+                // (ver carga inicial en OnAfterRenderAsync).
 
                 await JS.InvokeVoidAsync("console.log", $"[EditarPerfil] Perfil cargado: {profileDto.FullName}");
             }
@@ -532,33 +532,48 @@
             // Combinar nombre y apellido
             var fullName = $"{nombre.Trim()} {apellido.Trim()}".Trim();
 
-            // Serializar FavoriteCryptoIds como JSON
-            var favCryptoJson = favoriteCryptoIds.Count > 0 ? JsonSerializer.Serialize(favoriteCryptoIds.ToList()) : null;
-
-            // Guardar en DB vía ProfileService (Blazor Server: llamada directa, sin HTTP)
+            // Guardar datos del perfil
             var dto = new ProfileService.ProfileDto(
                 FullName: fullName,
                 Email: email.Trim(),
                 Bio: string.IsNullOrWhiteSpace(bio) ? null : bio,
-                Country: string.IsNullOrWhiteSpace(pais) ? null : pais,
-                FavoriteCryptoIds: favCryptoJson
+                Country: string.IsNullOrWhiteSpace(pais) ? null : pais
             );
 
-            var (success, errorMsg) = await ProfileSvc.SaveUserProfileAsync(_currentUserId, dto);
+            var (success, errorMsg) =
+                await ProfileSvc.SaveUserProfileAsync(_currentUserId, dto);
+
+            // Sincronizar favoritos con UserFavorites
+            var favoritesSynced = false;
 
             if (success)
             {
+                favoritesSynced = await FavoriteCryptoSvc.SetFavoriteCryptosAsync(
+                    _currentUserId,
+                    favoriteCryptoIds);
+            }
+
+            if (success && favoritesSynced)
+            {
                 // Guardar foto en localStorage con clave por UserId
                 var photoKey = $"cv_profile_photo_{_currentUserId}";
-                if (photoDataUrl != null)
-                    await JS.InvokeVoidAsync("localStorage.setItem", photoKey, photoDataUrl);
-                else
-                    await JS.InvokeVoidAsync("localStorage.removeItem", photoKey);
 
-                // Escribir datos en localStorage para que Perfil.razor los lea
+                if (photoDataUrl != null)
+                    await JS.InvokeVoidAsync(
+                        "localStorage.setItem",
+                        photoKey,
+                        photoDataUrl);
+                else
+                    await JS.InvokeVoidAsync(
+                        "localStorage.removeItem",
+                        photoKey);
+
+                // Guardar datos auxiliares del perfil en localStorage
                 if (!string.IsNullOrEmpty(_currentUsername))
                 {
-                    var profileDataKey = $"cv_profile_data_{_currentUsername}";
+                    var profileDataKey =
+                        $"cv_profile_data_{_currentUsername}";
+
                     var profileJson = JsonSerializer.Serialize(new
                     {
                         Nombre = nombre.Trim(),
@@ -568,30 +583,42 @@
                         Bio = bio,
                         Pais = pais,
                         Moneda = (string?)null,
-                        AvatarIcon = selectedAvatarIcon,
-                        FavoriteCryptoIds = favoriteCryptoIds.ToArray()
+                        AvatarIcon = selectedAvatarIcon
                     });
-                    await JS.InvokeVoidAsync("localStorage.setItem", profileDataKey, profileJson);
+
+                    await JS.InvokeVoidAsync(
+                        "localStorage.setItem",
+                        profileDataKey,
+                        profileJson);
                 }
 
-                // Mostrar mensaje de éxito debajo del botón con scroll suave
                 isSaving = false;
                 saveResultIsSuccess = true;
                 saveResultMessage = Loc["profile.edit.profileUpdated"];
-                StateHasChanged();
-                await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
 
-                // Redirigir tras breve pausa
+                StateHasChanged();
+
+                await JS.InvokeVoidAsync(
+                    "scrollIntoViewById",
+                    "save-status-msg");
+
                 await Task.Delay(2000);
+
                 Nav.NavigateTo("perfil");
             }
             else
             {
                 isSaving = false;
                 saveResultIsSuccess = false;
-                saveResultMessage = Loc["profile.edit.saveError"];
+                saveResultMessage = !success && !string.IsNullOrEmpty(errorMsg)
+                    ? errorMsg
+                    : Loc["profile.edit.saveError"];
+
                 StateHasChanged();
-                await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
+
+                await JS.InvokeVoidAsync(
+                    "scrollIntoViewById",
+                    "save-status-msg");
             }
         }
         catch (Exception ex)
@@ -599,9 +626,16 @@
             isSaving = false;
             saveResultIsSuccess = false;
             saveResultMessage = Loc["profile.edit.saveError"];
-            await JS.InvokeVoidAsync("console.error", $"[EditarPerfil] Error en SaveChanges: {ex}");
+
+            await JS.InvokeVoidAsync(
+                "console.error",
+                $"[EditarPerfil] Error en SaveChanges: {ex}");
+
             StateHasChanged();
-            await JS.InvokeVoidAsync("scrollIntoViewById", "save-status-msg");
+
+            await JS.InvokeVoidAsync(
+                "scrollIntoViewById",
+                "save-status-msg");
         }
     }
 

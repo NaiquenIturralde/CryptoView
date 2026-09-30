@@ -15,5 +15,10 @@ namespace CryptoView.Data
         public string Role { get; set; } = "Usuario";
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Criptomonedas marcadas como favoritas por este usuario (tabla UserFavorites).
+        /// </summary>
+        public virtual ICollection<UserFavorite> Favorites { get; set; } = new List<UserFavorite>();
     }
 }

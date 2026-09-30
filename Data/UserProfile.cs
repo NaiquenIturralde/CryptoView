@@ -36,11 +36,7 @@ namespace CryptoView.Data
         /// </summary>
         public string? Country { get; set; }
 
-        /// <summary>
-        /// JSON array of favorite cryptocurrency IDs. Stored as string for simplicity.
-        /// Example: "[1, 2, 5]"
-        /// </summary>
-        public string? FavoriteCryptoIds { get; set; }
+
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

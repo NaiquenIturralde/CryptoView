@@ -85,5 +85,10 @@ namespace CryptoView.Data
         /// Colección de notas del usuario asociadas a esta criptomoneda
         /// </summary>
         public virtual ICollection<UserNote> Notes { get; set; } = new List<UserNote>();
+
+        /// <summary>
+        /// Usuarios que marcaron esta criptomoneda como favorita (tabla UserFavorites).
+        /// </summary>
+        public virtual ICollection<UserFavorite> FavoritedBy { get; set; } = new List<UserFavorite>();
     }
 }

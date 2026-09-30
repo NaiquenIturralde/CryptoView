@@ -37,6 +37,12 @@ namespace CryptoView.Data
         public DbSet<UserProfile> UserProfiles { get; set; }
 
         /// <summary>
+        /// Tabla intermedia normalizada de favoritos por usuario (UserId + CryptoCurrencyId).
+        /// Reemplaza progresivamente UserProfile.FavoriteCryptoIds (JSON).
+        /// </summary>
+        public DbSet<UserFavorite> UserFavorites { get; set; }
+
+        /// <summary>
         /// Configuración del modelo de datos y relaciones
         /// </summary>
         /// <param name="modelBuilder">Constructor del modelo</param>
@@ -98,6 +104,31 @@ namespace CryptoView.Data
 
                 // Índice en Email para búsquedas rápidas
                 entity.HasIndex(e => e.Email);
+            });
+
+            // Configuración de la entidad UserFavorite
+            modelBuilder.Entity<UserFavorite>(entity =>
+            {
+                // Clave primaria compuesta (UserId, CryptoCurrencyId)
+                // Evita duplicados a nivel de base de datos.
+                entity.HasKey(e => new { e.UserId, e.CryptoCurrencyId });
+
+                // FK hacia AppUsers: al eliminar un usuario se eliminan sus favoritos
+                entity.HasOne(e => e.AppUser)
+                      .WithMany(u => u.Favorites)
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // FK hacia CryptoCurrencies: no se permite eliminar una criptomoneda
+                // que tenga favoritos asociados (integridad del catálogo)
+                entity.HasOne(e => e.CryptoCurrency)
+                      .WithMany(c => c.FavoritedBy)
+                      .HasForeignKey(e => e.CryptoCurrencyId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                // Índice en CryptoCurrencyId para consultas inversas
+                // ("¿qué usuarios siguen esta moneda?")
+                entity.HasIndex(e => e.CryptoCurrencyId);
             });
 
             // Datos de prueba (seed data) - opcional

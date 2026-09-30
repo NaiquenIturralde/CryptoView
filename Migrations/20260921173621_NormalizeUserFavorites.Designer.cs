@@ -4,6 +4,7 @@ using CryptoView.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CryptoView.Migrations
 {
     [DbContext(typeof(CryptoDbContext))]
-    partial class CryptoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921173621_NormalizeUserFavorites")]
+    partial class NormalizeUserFavorites
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -123,9 +126,9 @@ namespace CryptoView.Migrations
                             Change24h = 0m,
                             CoinId = "bitcoin",
                             CurrentPrice = 0m,
-                            DateAdded = new DateTime(2026, 9, 21, 19, 54, 1, 808, DateTimeKind.Utc).AddTicks(6629),
+                            DateAdded = new DateTime(2026, 9, 21, 17, 36, 20, 996, DateTimeKind.Utc).AddTicks(5983),
                             IsActive = true,
-                            LastUpdated = new DateTime(2026, 9, 21, 19, 54, 1, 808, DateTimeKind.Utc).AddTicks(6632),
+                            LastUpdated = new DateTime(2026, 9, 21, 17, 36, 20, 996, DateTimeKind.Utc).AddTicks(5984),
                             MarketCap = 0m,
                             Name = "Bitcoin",
                             Symbol = "BTC",
@@ -137,9 +140,9 @@ namespace CryptoView.Migrations
                             Change24h = 0m,
                             CoinId = "ethereum",
                             CurrentPrice = 0m,
-                            DateAdded = new DateTime(2026, 9, 21, 19, 54, 1, 808, DateTimeKind.Utc).AddTicks(6636),
+                            DateAdded = new DateTime(2026, 9, 21, 17, 36, 20, 996, DateTimeKind.Utc).AddTicks(5988),
                             IsActive = true,
-                            LastUpdated = new DateTime(2026, 9, 21, 19, 54, 1, 808, DateTimeKind.Utc).AddTicks(6637),
+                            LastUpdated = new DateTime(2026, 9, 21, 17, 36, 20, 996, DateTimeKind.Utc).AddTicks(5988),
                             MarketCap = 0m,
                             Name = "Ethereum",
                             Symbol = "ETH",
@@ -224,6 +227,9 @@ namespace CryptoView.Migrations
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("FavoriteCryptoIds")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
