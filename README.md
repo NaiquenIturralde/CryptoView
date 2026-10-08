@@ -3,6 +3,14 @@
 CryptoView es una aplicación web desarrollada en Blazor Server con .NET 8, orientada al seguimiento, la consulta y el análisis básico de criptomonedas. Permite al usuario gestionar una lista personalizada de activos, consultar precios y variaciones de mercado, registrar notas sobre cada moneda, visualizar gráficos estadísticos y administrar su perfil y preferencias dentro de una interfaz clara y responsive.
 
 ---
+## Demo
+
+Esta sección queda preparada para incluir material visual del proyecto en funcionamiento.
+
+- Link al video demo: (https://youtu.be/8zhTYH3Q0sg)
+- Probar la app: (https://cryptoview.runasp.net/login)
+  
+---
 
 ## Objetivo del proyecto
 
@@ -96,14 +104,6 @@ Los tres valores `--bg-*` definen los tres niveles de fondo de la aplicación: f
 
 ---
 
-## Demo
-
-Esta sección queda preparada para incluir material visual del proyecto en funcionamiento.
-
-- Link al video demo: (https://youtu.be/8zhTYH3Q0sg)
-- Probar la app: (https://cryptoview.runasp.net/login)
-
----
 
 ## Instalación y Ejecución
 
